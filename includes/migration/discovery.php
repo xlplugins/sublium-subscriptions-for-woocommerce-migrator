@@ -38,9 +38,12 @@ class Discovery {
 		if ( function_exists( 'wcs_get_subscription_statuses' ) || function_exists( 'wcs_get_subscription' ) ) {
 			$result['active'] = true;
 			// Try to get version from constant or class.
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WCS_VERSION is defined by WooCommerce Subscriptions plugin.
 			if ( defined( 'WCS_VERSION' ) ) {
-				$result['version']    = WCS_VERSION;
-				$result['compatible'] = version_compare( WCS_VERSION, '2.0.0', '>=' );
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WCS_VERSION is defined by WooCommerce Subscriptions plugin.
+				$wcs_version = constant( 'WCS_VERSION' );
+				$result['version']    = $wcs_version;
+				$result['compatible'] = version_compare( $wcs_version, '2.0.0', '>=' );
 			} elseif ( class_exists( '\WC_Subscriptions' ) || class_exists( 'WC_Subscriptions' ) ) {
 				$wcs_class = class_exists( '\WC_Subscriptions' ) ? '\WC_Subscriptions' : 'WC_Subscriptions';
 				if ( method_exists( $wcs_class, 'instance' ) ) {
@@ -140,96 +143,30 @@ class Discovery {
 	 * @return int Number of active subscriptions.
 	 */
 	public function get_active_subscription_count() {
-		// Try using WCS function first if available.
-		if ( function_exists( 'wcs_get_subscriptions' ) ) {
-			try {
-				$subscriptions = wcs_get_subscriptions(
-					array(
-						'subscription_status' => 'active',
-						'limit'               => -1,
-						'return'              => 'ids',
-					)
-				);
-				if ( is_array( $subscriptions ) && ! empty( $subscriptions ) ) {
-					return count( $subscriptions );
-				}
-			} catch ( \Exception $e ) {
-				// Fall through to direct query.
-			}
+		// Use WCS native function to get active subscriptions.
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return 0;
 		}
 
-		global $wpdb;
-
-		// Check if HPOS is enabled.
-		$hpos_enabled = false;
-		if ( class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) ) {
-			$hpos_enabled = \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
-		}
-
-		if ( $hpos_enabled ) {
-			// Use HPOS tables.
-			$orders_table = $wpdb->prefix . 'wc_orders';
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT COUNT(*)
-					FROM {$orders_table}
-					WHERE type = 'shop_subscription'
-					AND status IN ('wc-active', 'wc-pending-cancel')"
-				)
-			);
-		} else {
-			// Use posts table - try different status formats.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-			$count = $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT COUNT(*)
-					FROM {$wpdb->posts}
-					WHERE post_type = 'shop_subscription'
-					AND post_status IN ('wc-active', 'wc-pending-cancel', 'active', 'pending-cancel')"
+		try {
+			// Get active and pending-cancel subscriptions (both are considered "active" for migration).
+			$subscriptions = wcs_get_subscriptions(
+				array(
+					'subscription_status' => array( 'active', 'pending-cancel' ),
+					'limit'               => -1,
+					'return'              => 'ids',
 				)
 			);
 
-			// If still 0, try without status filter to see total subscriptions.
-			if ( 0 === absint( $count ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-				$total = $wpdb->get_var(
-					$wpdb->prepare(
-						"SELECT COUNT(*)
-						FROM {$wpdb->posts}
-						WHERE post_type = 'shop_subscription'"
-					)
-				);
-				// If we have subscriptions but none match active status, try getting all statuses.
-				if ( absint( $total ) > 0 ) {
-					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-					$statuses = $wpdb->get_col(
-						$wpdb->prepare(
-							"SELECT DISTINCT post_status
-							FROM {$wpdb->posts}
-							WHERE post_type = 'shop_subscription'
-							LIMIT 10"
-						)
-					);
-					// Try with found statuses.
-					if ( ! empty( $statuses ) ) {
-						$status_placeholders = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
-						// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-						$count = $wpdb->get_var(
-							$wpdb->prepare(
-								"SELECT COUNT(*)
-								FROM {$wpdb->posts}
-								WHERE post_type = 'shop_subscription'
-								AND post_status IN ($status_placeholders)",
-								$statuses
-							)
-						);
-					}
-				}
+			if ( is_array( $subscriptions ) ) {
+				return count( $subscriptions );
 			}
+		} catch ( \Exception $e ) {
+			// If WCS function fails, return 0.
+			return 0;
 		}
 
-		return absint( $count );
+		return 0;
 	}
 
 	/**
@@ -238,69 +175,65 @@ class Discovery {
 	 * @return array Gateway summary with counts and compatibility.
 	 */
 	public function discover_payment_gateways() {
-		global $wpdb;
-
-		// Check if HPOS is enabled.
-		$hpos_enabled = false;
-		if ( class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) ) {
-			$hpos_enabled = \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+		// Use WCS native function to get subscriptions.
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return array();
 		}
 
-		if ( $hpos_enabled ) {
-			// Use HPOS tables.
-			$orders_table = $wpdb->prefix . 'wc_orders';
-			$orders_meta_table = $wpdb->prefix . 'wc_orders_meta';
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-			$query = $wpdb->prepare(
-				"SELECT
-					om1.meta_value as gateway_id,
-					COUNT(DISTINCT o.id) as subscription_count,
-					COUNT(DISTINCT CASE WHEN om2.meta_value = 'true' THEN o.id END) as manual_renewal_count
-				FROM {$orders_table} o
-				INNER JOIN {$orders_meta_table} om1 ON o.id = om1.order_id AND om1.meta_key = '_payment_method'
-				LEFT JOIN {$orders_meta_table} om2 ON o.id = om2.order_id AND om2.meta_key = '_requires_manual_renewal'
-				WHERE o.type = 'shop_subscription'
-				AND o.status IN ('wc-active', 'wc-pending-cancel')
-				GROUP BY om1.meta_value
-				ORDER BY subscription_count DESC"
+		try {
+			// Get active and pending-cancel subscriptions.
+			$subscriptions = wcs_get_subscriptions(
+				array(
+					'subscription_status' => array( 'active', 'pending-cancel' ),
+					'limit'               => -1,
+					'return'              => 'objects',
+				)
 			);
-		} else {
-			// Use posts table.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-			$query = $wpdb->prepare(
-				"SELECT
-					pm.meta_value as gateway_id,
-					COUNT(DISTINCT p.ID) as subscription_count,
-					COUNT(DISTINCT CASE WHEN pm2.meta_value = 'true' THEN p.ID END) as manual_renewal_count
-				FROM {$wpdb->posts} p
-				INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_payment_method'
-				LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = '_requires_manual_renewal'
-				WHERE p.post_type = 'shop_subscription'
-				AND p.post_status IN ('wc-active', 'wc-pending-cancel')
-				GROUP BY pm.meta_value
-				ORDER BY subscription_count DESC"
-			);
+
+			if ( ! is_array( $subscriptions ) || empty( $subscriptions ) ) {
+				return array();
+			}
+
+			// Count gateways from subscription objects.
+			$gateway_counts = array();
+			foreach ( $subscriptions as $subscription ) {
+				if ( ! is_a( $subscription, 'WC_Subscription' ) ) {
+					continue;
+				}
+
+				$gateway_id = $subscription->get_payment_method();
+				if ( empty( $gateway_id ) ) {
+					continue;
+				}
+
+				if ( ! isset( $gateway_counts[ $gateway_id ] ) ) {
+					$gateway_counts[ $gateway_id ] = 0;
+				}
+				$gateway_counts[ $gateway_id ]++;
+			}
+
+			// Sort by count descending.
+			arsort( $gateway_counts );
+
+			// Build gateway summary.
+			$gateway_summary = array();
+			foreach ( $gateway_counts as $gateway_id => $count ) {
+				$compatible = $this->check_gateway_compatibility( $gateway_id );
+
+				$gateway_summary[] = array(
+					'gateway_id'          => $gateway_id,
+					'gateway_title'       => $this->get_gateway_title( $gateway_id ),
+					'subscription_count'  => absint( $count ),
+					'compatible'          => $compatible['compatible'],
+					'message'            => $compatible['message'],
+				);
+			}
+
+			return $gateway_summary;
+		} catch ( \Exception $e ) {
+			// If WCS function fails, return empty array.
+			return array();
 		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Query is prepared above
-		$gateway_data = $wpdb->get_results( $query, ARRAY_A );
-
-		$gateway_summary = array();
-		foreach ( $gateway_data as $gateway ) {
-			$gateway_id = isset( $gateway['gateway_id'] ) ? $gateway['gateway_id'] : '';
-			$compatible = $this->check_gateway_compatibility( $gateway_id );
-
-			$gateway_summary[] = array(
-				'gateway_id'          => $gateway_id,
-				'gateway_title'       => $this->get_gateway_title( $gateway_id ),
-				'subscription_count'  => absint( $gateway['subscription_count'] ),
-				'manual_renewal_count' => absint( $gateway['manual_renewal_count'] ),
-				'compatible'          => $compatible['compatible'],
-				'message'            => $compatible['message'],
-			);
-		}
-
-		return $gateway_summary;
 	}
 
 	/**
@@ -320,9 +253,23 @@ class Discovery {
 
 		// Map common WCS gateways to Sublium.
 		$gateway_map = array(
-			'stripe'              => 'stripe',
-			'stripe_cc'           => 'stripe',
-			'paypal'              => 'paypal',
+			'stripe'              => 'fkwcs_stripe',
+			'stripe_cc'           => 'fkwcs_stripe',
+			'paypal'              => 'fkwcppcp_paypal',
+			'ppcp-gateway'        => 'fkwcppcp_paypal',
+			'square_credit_card'  => 'fkwcsq_square',
+			'fkwcs_stripe'=>'fkwcs_stripe',
+			'fkwcppcp_paypal'=>'fkwcppcp_paypal',
+			'fkwcsq_square'=>'fkwcsq_square',
+			'fkwcs_stripe'=>'fkwcs_stripe',
+			'fkwcppcp_paypal'=>'fkwcppcp_paypal',
+			'fkwcsq_square'=>'fkwcsq_square',
+			'fkwcs_stripe'=>'fkwcs_stripe',
+			'fkwcppcp_paypal'=>'fkwcppcp_paypal',
+			'fkwcsq_square'=>'fkwcsq_square',
+			'fkwcs_stripe'=>'fkwcs_stripe',
+			'fkwcppcp_paypal'=>'fkwcppcp_paypal',
+			'fkwcsq_square'=>'fkwcsq_square',
 			'authorize_net_cim'    => 'authorize_net',
 			'bacs'                => 'bacs',
 			'cheque'              => 'cheque',
@@ -369,51 +316,44 @@ class Discovery {
 	 * @return array Product counts by type.
 	 */
 	public function get_subscription_products_summary() {
-		global $wpdb;
+		// Use WooCommerce native function to get products.
+		if ( ! function_exists( 'wc_get_products' ) ) {
+			return array(
+				'simple_count'   => 0,
+				'variable_count' => 0,
+				'wcsatt_count'   => 0,
+				'wcsatt_active'  => false,
+				'total'          => 0,
+			);
+		}
 
-		// Simple subscription products - check both taxonomy and postmeta.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-		$simple_count = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT p.ID)
-				FROM {$wpdb->posts} p
-				LEFT JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
-				LEFT JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-				LEFT JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-				LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_product_type'
-				WHERE p.post_type = 'product'
-				AND p.post_status = 'publish'
-				AND (
-					(tt.taxonomy = 'product_type' AND t.slug = 'subscription')
-					OR pm.meta_value = 'subscription'
-				)"
+		// Get simple subscription products.
+		$simple_products = wc_get_products(
+			array(
+				'type'   => array( 'subscription' ),
+				'status' => 'publish',
+				'limit'  => -1,
+				'return' => 'ids',
 			)
 		);
+		$simple_count = is_array( $simple_products ) ? count( $simple_products ) : 0;
 
-		// Variable subscription products - check both taxonomy and postmeta.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-		$variable_count = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT p.ID)
-				FROM {$wpdb->posts} p
-				LEFT JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
-				LEFT JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-				LEFT JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
-				LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_product_type'
-				WHERE p.post_type = 'product'
-				AND p.post_status = 'publish'
-				AND (
-					(tt.taxonomy = 'product_type' AND t.slug = 'variable-subscription')
-					OR pm.meta_value = 'variable-subscription'
-				)"
+		// Get variable subscription products.
+		$variable_products = wc_get_products(
+			array(
+				'type'   => array( 'variable-subscription' ),
+				'status' => 'publish',
+				'limit'  => -1,
+				'return' => 'ids',
 			)
 		);
+		$variable_count = is_array( $variable_products ) ? count( $variable_products ) : 0;
 
-		// WCS_ATT products - check if plugin exists or if meta exists.
+		// Check for WCS_ATT products.
 		$wcsatt_count = 0;
 		$wcsatt_active = false;
 
-		// Check if WCS_ATT plugin is active by checking for the class or plugin file.
+		// Check if WCS_ATT plugin is active.
 		if ( class_exists( '\WCS_ATT' ) ) {
 			$wcsatt_active = true;
 		} else {
@@ -430,24 +370,29 @@ class Discovery {
 			}
 		}
 
-		// Always check for WCS_ATT products if meta exists, regardless of plugin status.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Migration discovery query
-		$wcsatt_count = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT p.ID)
-				FROM {$wpdb->posts} p
-				INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-				WHERE p.post_type = 'product'
-				AND p.post_status = 'publish'
-				AND pm.meta_key = '_wcsatt_schemes'
-				AND pm.meta_value != ''
-				AND pm.meta_value != 'a:0:{}'"
+		// Get all published products to check for WCS_ATT meta.
+		$all_products = wc_get_products(
+			array(
+				'status' => 'publish',
+				'limit'  => -1,
+				'return' => 'ids',
 			)
 		);
 
-		// If we found WCS_ATT products, mark plugin as active.
-		if ( $wcsatt_count > 0 ) {
-			$wcsatt_active = true;
+		if ( is_array( $all_products ) ) {
+			foreach ( $all_products as $product_id ) {
+				$product = wc_get_product( $product_id );
+				if ( ! $product ) {
+					continue;
+				}
+
+				// Check for WCS_ATT schemes meta.
+				$schemes = $product->get_meta( '_wcsatt_schemes', true );
+				if ( ! empty( $schemes ) && is_array( $schemes ) && ! empty( $schemes ) ) {
+					$wcsatt_count++;
+					$wcsatt_active = true;
+				}
+			}
 		}
 
 		return array(

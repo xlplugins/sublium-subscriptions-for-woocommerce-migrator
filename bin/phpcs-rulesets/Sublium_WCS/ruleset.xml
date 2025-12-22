@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         name="SubliumCustomSniffs"
+         namespace="Sublium"
+         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+
+    <description>Custom Sublium Sniffs</description>
+
+    <!-- Custom Code Analysis Sniffs -->
+    <!-- Note: SubliumSpecific works without external dependencies -->
+    <rule ref="Sublium_WCS.CodeAnalysis.SubliumSpecific"/>
+
+    <!-- Fixed custom sniffs (no external dependencies) -->
+    <rule ref="Sublium_WCS.CodeAnalysis.DiscouragedFunctions"/>
+    <rule ref="Sublium_WCS.CodeAnalysis.RequiredFunctionParameters"/>
+    <rule ref="Sublium_WCS.CodeAnalysis.SettingSanitization"/>
+    <rule ref="Sublium_WCS.CodeAnalysis.Localhost"/>
+    <rule ref="Sublium_WCS.CodeAnalysis.InlineScriptStyle"/>
+
+    <!-- Custom Security Sniffs -->
+    <rule ref="Sublium_WCS.Security.DirectDB"/>
+
+    <!-- Other custom sniffs require PHPCSUtils and WordPressCS dependencies -->
+    <!-- To enable them, install globally: composer global require phpcsstandards/phpcsutils wp-coding-standards/wpcs -->
+    <!-- <rule ref="Sublium_WCS.CodeAnalysis.EnqueuedResourceOffloading"/> -->
+    <!-- <rule ref="Sublium_WCS.CodeAnalysis.Offloading"/> -->
+
+</ruleset>

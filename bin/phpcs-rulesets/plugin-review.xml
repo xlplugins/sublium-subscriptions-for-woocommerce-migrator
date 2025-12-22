@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         name="WordPressPluginReview"
+         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+
+    <description>WordPress.org Plugin Review Standards</description>
+
+    <!-- Prevent errors caused by WordPress Coding Standards not supporting PHP 8.0+ -->
+    <ini name="error_reporting" value="E_ALL &amp; ~E_DEPRECATED" />
+
+    <arg name="report" value="code"/>
+    <arg value="s"/>
+
+    <!-- Plugins should be compatible with PHP 7.4
+    and higher -->
+    <config name="testVersion" value="7.4-"/>
+
+    <!-- Exclude common third-party libraries -->
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/assets/*</exclude-pattern>
+    <exclude-pattern>*/tgm-plugin-activation/*</exclude-pattern>
+    <exclude-pattern>*/freemius/*</exclude-pattern>
+    <exclude-pattern>*/dompdf/*</exclude-pattern>
+    <exclude-pattern>*/cmb2/*</exclude-pattern>
+    <exclude-pattern>*/redux-framework/*</exclude-pattern>
+    <exclude-pattern>*/cherry-framework/*</exclude-pattern>
+    <exclude-pattern>*/titan-framework/*</exclude-pattern>
+    <exclude-pattern>*/guzzlehttp/*</exclude-pattern>
+    <exclude-pattern>*/vendors/*</exclude-pattern>
+    <exclude-pattern>*/plugin-update-checker/*</exclude-pattern>
+    <exclude-pattern>*/composer_directory/*</exclude-pattern>
+
+    <!-- Include core plugin check rules -->
+    <rule ref="./plugin-check.ruleset.xml" />
+
+</ruleset>

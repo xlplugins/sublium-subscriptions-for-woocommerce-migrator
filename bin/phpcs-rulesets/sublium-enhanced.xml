@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         name="SubliumEnhanced"
+         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+
+    <description>Enhanced Rules for Sublium Plugin</description>
+
+
+
+    <!-- Custom sanitization functions for funnel-builder -->
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <properties>
+            <property name="customSanitizingFunctions" type="array">
+                <element value="wc_clean"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Custom nonce verification functions -->
+    <rule ref="WordPress.Security.NonceVerification">
+        <properties>
+            <property name="customNonceVerificationFunctions" type="array">
+                <element value="wfacp_check_nonce"/>
+                <element value="wffn_check_nonce"/>
+                <element value="bwf_check_nonce"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Sublium specific database rules -->
+    <rule ref="WordPress.DB">
+        <exclude name="WordPress.DB.DirectDatabaseQuery"/>
+        <exclude name="WordPress.DB.SlowDBQuery"/>
+    </rule>
+
+
+    <!-- Internationalization checks -->
+    <rule ref="WordPress.WP.I18n"/>
+
+    <!-- Escape output checks -->
+    <rule ref="WordPress.Security.EscapeOutput"/>
+
+    <!-- Enqueued resources checks -->
+    <rule ref="WordPress.WP.EnqueuedResources"/>
+    <rule ref="WordPress.WP.EnqueuedResourceParameters"/>
+
+
+
+    <rule ref="WordPress.Files.FileName.InvalidClassFileName">
+        <exclude-pattern>/*</exclude-pattern>
+    </rule>
+
+
+
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <property name="forbiddenFunctions" type="array">
+                <element key="wc_clean" value="sublium_clean"/>
+            </property>
+        </properties>
+    </rule>
+
+
+
+
+
+
+</ruleset>
