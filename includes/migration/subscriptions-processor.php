@@ -338,11 +338,20 @@ class Subscriptions_Processor {
 			}
 		}
 
+		// Get billing length from product if not already set.
+		$billing_length_meta = 0;
+		if ( ! empty( $product_ids ) && function_exists( 'WC_Subscriptions_Product::get_length' ) ) {
+			$first_product = wc_get_product( $product_ids[0] );
+			if ( $first_product ) {
+				$billing_length_meta = absint( \WC_Subscriptions_Product::get_length( $first_product ) );
+			}
+		}
+
 		// Prepare meta data.
 		$meta_data = array(
 			'billing_frequency' => absint( $billing_interval ),
 			'billing_interval'  => $this->convert_period_to_interval( $billing_period ),
-			'billing_length'    => absint( $wcs_subscription->get_length() ),
+			'billing_length'    => $billing_length_meta,
 			'trial_length'      => absint( $wcs_subscription->get_trial_length() ),
 			'trial_period'      => $wcs_subscription->get_trial_period(),
 			'signup_fee'        => (float) $wcs_subscription->get_sign_up_fee(),
