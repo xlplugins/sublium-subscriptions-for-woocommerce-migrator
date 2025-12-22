@@ -55,52 +55,175 @@ class Scheduler {
 	}
 
 	/**
-	 * Start migration.
+	 * Start products migration.
 	 *
 	 * @return array Result.
 	 */
-	public function start_migration() {
+	public function start_products_migration() {
 		$state = new State();
 		$current_state = $state->get_state();
 
-		// Check if migration already in progress.
-		if ( in_array( $current_state['status'], array( 'products_migrating', 'subscriptions_migrating' ), true ) ) {
+		// Clear debug log when starting fresh migration.
+		$debug_log_path = __DIR__ . '/debug.log';
+		if ( file_exists( $debug_log_path ) ) {
+			file_put_contents( $debug_log_path, '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		}
+
+		// Check if products migration already in progress.
+		if ( 'products_migrating' === $current_state['status'] ) {
 			return array(
 				'success' => false,
-				'message' => __( 'Migration is already in progress', 'wcs-sublium-migrator' ),
+				'message' => __( 'Products migration is already in progress', 'wcs-sublium-migrator' ),
 			);
 		}
 
-		// Reset state.
-		$state->reset_state();
-		$state->set_status( 'discovering' );
+		// Check if products migration already completed.
+		$is_completed = false;
+		if ( isset( $current_state['products_migration']['processed_products'] ) &&
+			 isset( $current_state['products_migration']['total_products'] ) &&
+			 absint( $current_state['products_migration']['total_products'] ) > 0 ) {
+			$is_completed = absint( $current_state['products_migration']['processed_products'] ) >= absint( $current_state['products_migration']['total_products'] );
+		}
 
-		// Run discovery.
-		$discovery = new Discovery();
-		$feasibility = $discovery->get_feasibility_data();
+		// If completed but no plans were created, allow restart (something went wrong).
+		if ( $is_completed && isset( $current_state['products_migration']['created_plans'] ) && absint( $current_state['products_migration']['created_plans'] ) === 0 ) {
+			// Reset to allow restart.
+			$current_state['products_migration']['processed_products'] = 0;
+			$current_state['products_migration']['created_plans'] = 0;
+			$current_state['products_migration']['failed_products'] = 0;
+			$current_state['errors'] = array();
+			$is_completed = false;
+		}
 
-		// Check readiness.
-		if ( 'blocked' === $feasibility['readiness']['status'] ) {
-			$state->set_status( 'error' );
+		if ( $is_completed ) {
 			return array(
 				'success' => false,
-				'message' => $feasibility['readiness']['message'],
+				'message' => __( 'Products migration is already completed', 'wcs-sublium-migrator' ),
 			);
 		}
 
-		// Initialize state with counts.
-		$new_state = $state->get_state();
-		$new_state['products_migration']['total_products'] = $feasibility['products']['total'];
-		$new_state['subscriptions_migration']['total_subscriptions'] = $feasibility['active_subscriptions'];
-		$new_state['start_time'] = current_time( 'mysql' );
-		$state->update_state( $new_state );
+		// Run discovery if not already done or if restarting.
+		if ( empty( $current_state['products_migration']['total_products'] ) || absint( $current_state['products_migration']['processed_products'] ) === 0 ) {
+			$discovery = new Discovery();
+			$feasibility = $discovery->get_feasibility_data();
 
-		// Schedule first products batch.
-		$this->schedule_products_batch( 0 );
+			// Check readiness.
+			if ( 'blocked' === $feasibility['readiness']['status'] ) {
+				return array(
+					'success' => false,
+					'message' => $feasibility['readiness']['message'],
+				);
+			}
+
+			// Initialize state with counts.
+			$current_state['products_migration']['total_products'] = $feasibility['products']['total'];
+			$current_state['subscriptions_migration']['total_subscriptions'] = $feasibility['active_subscriptions'];
+			if ( empty( $current_state['start_time'] ) ) {
+				$current_state['start_time'] = current_time( 'mysql' );
+			}
+		}
+
+		// Reset products migration progress if starting fresh.
+		if ( empty( $current_state['products_migration']['processed_products'] ) || absint( $current_state['products_migration']['processed_products'] ) === 0 ) {
+			$current_state['products_migration']['processed_products'] = 0;
+			$current_state['products_migration']['created_plans'] = 0;
+			$current_state['products_migration']['failed_products'] = 0;
+			$current_state['errors'] = array();
+		}
+
+		$state->update_state( $current_state );
+		$state->set_status( 'products_migrating' );
+
+		// Process first batch immediately (synchronously) for testing, then schedule subsequent batches.
+		$offset = absint( $current_state['products_migration']['processed_products'] ?? 0 );
+
+		// Process first batch immediately.
+		$this->process_products_batch( $offset );
 
 		return array(
 			'success' => true,
-			'message' => __( 'Migration started successfully', 'wcs-sublium-migrator' ),
+			'message' => __( 'Products migration started successfully', 'wcs-sublium-migrator' ),
+		);
+	}
+
+	/**
+	 * Start subscriptions migration.
+	 *
+	 * @return array Result.
+	 */
+	public function start_subscriptions_migration() {
+		$state = new State();
+		$current_state = $state->get_state();
+
+		// Check if subscriptions migration already in progress.
+		if ( 'subscriptions_migrating' === $current_state['status'] ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Subscriptions migration is already in progress', 'wcs-sublium-migrator' ),
+			);
+		}
+
+		// Check if subscriptions migration already completed.
+		if ( isset( $current_state['subscriptions_migration']['processed_subscriptions'] ) &&
+			 isset( $current_state['subscriptions_migration']['total_subscriptions'] ) &&
+			 absint( $current_state['subscriptions_migration']['processed_subscriptions'] ) >= absint( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Subscriptions migration is already completed', 'wcs-sublium-migrator' ),
+			);
+		}
+
+		// Check if products migration is completed.
+		$products_completed = false;
+		if ( isset( $current_state['products_migration']['processed_products'] ) &&
+			 isset( $current_state['products_migration']['total_products'] ) ) {
+			$products_completed = absint( $current_state['products_migration']['processed_products'] ) >= absint( $current_state['products_migration']['total_products'] );
+		}
+
+		if ( ! $products_completed && absint( $current_state['products_migration']['total_products'] ?? 0 ) > 0 ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Please complete products migration first', 'wcs-sublium-migrator' ),
+			);
+		}
+
+		// Run discovery if not already done.
+		if ( empty( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
+			$discovery = new Discovery();
+			$feasibility = $discovery->get_feasibility_data();
+
+			// Check readiness.
+			if ( 'blocked' === $feasibility['readiness']['status'] ) {
+				return array(
+					'success' => false,
+					'message' => $feasibility['readiness']['message'],
+				);
+			}
+
+			// Initialize state with counts.
+			$current_state['subscriptions_migration']['total_subscriptions'] = $feasibility['active_subscriptions'];
+			if ( empty( $current_state['start_time'] ) ) {
+				$current_state['start_time'] = current_time( 'mysql' );
+			}
+		}
+
+		// Reset subscriptions migration progress if starting fresh.
+		if ( empty( $current_state['subscriptions_migration']['processed_subscriptions'] ) ) {
+			$current_state['subscriptions_migration']['processed_subscriptions'] = 0;
+			$current_state['subscriptions_migration']['created_subscriptions'] = 0;
+			$current_state['subscriptions_migration']['failed_subscriptions'] = 0;
+		}
+
+		$state->update_state( $current_state );
+		$state->set_status( 'subscriptions_migrating' );
+
+		// Schedule first subscriptions batch.
+		$offset = absint( $current_state['subscriptions_migration']['processed_subscriptions'] ?? 0 );
+		$this->schedule_subscriptions_batch( $offset );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Subscriptions migration started successfully', 'wcs-sublium-migrator' ),
 		);
 	}
 
@@ -111,7 +234,23 @@ class Scheduler {
 	 * @return void
 	 */
 	public function schedule_products_batch( $offset = 0 ) {
-		wp_schedule_single_event( time(), 'wcs_sublium_migrate_products_batch', array( $offset ) );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_products_batch' => array( 'offset' => $offset, 'timestamp' => time() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		// Check if already scheduled.
+		$scheduled = wp_next_scheduled( 'wcs_sublium_migrate_products_batch', array( $offset ) );
+		if ( $scheduled ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'already_scheduled' => array( 'offset' => $offset, 'scheduled_time' => $scheduled ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return;
+		}
+
+		$result = wp_schedule_single_event( time(), 'wcs_sublium_migrate_products_batch', array( $offset ) );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_result' => array( 'offset' => $offset, 'result' => $result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		// Trigger cron immediately if possible (for testing).
+		$disable_cron = defined( 'DISABLE_WP_CRON' ) && constant( 'DISABLE_WP_CRON' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core constant
+		if ( ! $disable_cron ) {
+			spawn_cron();
+		}
 	}
 
 	/**
@@ -131,17 +270,21 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_products_batch( $offset = 0 ) {
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_products_batch' => array( 'offset' => $offset, 'time' => current_time( 'mysql' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		$processor = new Products_Processor();
 		$result = $processor->process_batch( $offset );
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_result' => $result ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
 			$this->schedule_products_batch( $result['next_offset'] );
 		} else {
-			// Products migration complete, start subscriptions.
+			// Products migration complete.
 			$state = new State();
-			$state->set_status( 'subscriptions_migrating' );
-			$this->schedule_subscriptions_batch( 0 );
+			$state->set_status( 'idle' );
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'products_migration_complete' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 	}
 
@@ -219,6 +362,12 @@ class Scheduler {
 		// Clear scheduled events.
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_products_batch' );
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_subscriptions_batch' );
+
+		// Clear debug log.
+		$debug_log_path = __DIR__ . '/debug.log';
+		if ( file_exists( $debug_log_path ) ) {
+			file_put_contents( $debug_log_path, '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		}
 
 		$state = new State();
 		$state->reset_state();

@@ -15,26 +15,47 @@
 		},
 
 		bindEvents: function() {
-			$(document).on('click', '.wcs-migrator-start', this.handleStartMigration.bind(this));
+			$(document).on('click', '.wcs-migrator-start-products', this.handleStartProductsMigration.bind(this));
+			$(document).on('click', '.wcs-migrator-start-subscriptions', this.handleStartSubscriptionsMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-pause', this.handlePauseMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-resume', this.handleResumeMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-cancel', this.handleCancelMigration.bind(this));
+			$(document).on('click', '.wcs-migrator-reset', this.handleResetMigration.bind(this));
 		},
 
 		loadFeasibility: function() {
-			$.ajax({
-				url: this.apiUrl + 'discovery',
-				method: 'GET',
-				beforeSend: function(xhr) {
-					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
-				},
-				success: function(response) {
-					WCSMigrator.renderFeasibility(response);
-					WCSMigrator.checkMigrationStatus();
-				},
-				error: function() {
-					WCSMigrator.showError('Failed to load feasibility data');
+			const self = this;
+			// Load both discovery and status to determine button states
+			$.when(
+				$.ajax({
+					url: this.apiUrl + 'discovery',
+					method: 'GET',
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+					}
+				}),
+				$.ajax({
+					url: this.apiUrl + 'status',
+					method: 'GET',
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+					}
+				})
+			).done(function(discoveryResponse, statusResponse) {
+				const discoveryData = discoveryResponse[0];
+				const statusData = statusResponse[0];
+
+				// Check if migration is in progress
+				if (statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused') {
+					WCSMigrator.renderProgress(statusData);
+					WCSMigrator.startStatusPolling();
+				} else if (statusData.status === 'completed') {
+					WCSMigrator.renderCompleted(statusData);
+				} else {
+					WCSMigrator.renderFeasibility(discoveryData, statusData);
 				}
+			}).fail(function() {
+				WCSMigrator.showError('Failed to load feasibility data');
 			});
 		},
 
@@ -46,11 +67,14 @@
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
 				},
 				success: function(response) {
-					if (response.status !== 'idle' && response.status !== 'completed') {
+					if (response.status === 'products_migrating' || response.status === 'subscriptions_migrating' || response.status === 'paused') {
 						WCSMigrator.renderProgress(response);
 						WCSMigrator.startStatusPolling();
 					} else if (response.status === 'completed') {
 						WCSMigrator.renderCompleted(response);
+					} else {
+						// Status is idle - reload feasibility to update button states
+						WCSMigrator.loadFeasibility();
 					}
 				},
 				error: function() {
@@ -76,7 +100,45 @@
 			}
 		},
 
-		renderFeasibility: function(data) {
+		renderFeasibility: function(data, statusData) {
+			// Check migration status to determine button states
+			let productsDisabled = data.readiness.status === 'blocked';
+			let subscriptionsDisabled = data.readiness.status === 'blocked';
+			let productsButtonText = wcsSubliumMigrator.strings.startProductsMigration || 'Migrate Products';
+			let subscriptionsButtonText = wcsSubliumMigrator.strings.startSubscriptionsMigration || 'Migrate Subscriptions';
+
+			// Use status data if provided
+			if (statusData && statusData.products_migration) {
+				const productsCompleted = statusData.products_migration.processed_products >= statusData.products_migration.total_products;
+				const productsInProgress = statusData.status === 'products_migrating';
+				const subscriptionsCompleted = statusData.subscriptions_migration &&
+					statusData.subscriptions_migration.processed_subscriptions >= statusData.subscriptions_migration.total_subscriptions;
+				const subscriptionsInProgress = statusData.status === 'subscriptions_migrating';
+
+				// Disable subscriptions button if products not completed
+				if (!productsCompleted && statusData.products_migration.total_products > 0) {
+					subscriptionsDisabled = true;
+				}
+
+				// Disable products button if already completed or in progress
+				if (productsCompleted) {
+					productsDisabled = true;
+					productsButtonText = 'Products Migration Completed';
+				} else if (productsInProgress) {
+					productsDisabled = true;
+					productsButtonText = 'Products Migration In Progress...';
+				}
+
+				// Update subscriptions button text
+				if (subscriptionsCompleted) {
+					subscriptionsDisabled = true;
+					subscriptionsButtonText = 'Subscriptions Migration Completed';
+				} else if (subscriptionsInProgress) {
+					subscriptionsDisabled = true;
+					subscriptionsButtonText = 'Subscriptions Migration In Progress...';
+				}
+			}
+
 			const html = `
 				<div class="wcs-migrator-feasibility">
 					<h2>Migration Feasibility Analysis</h2>
@@ -113,7 +175,6 @@
 								<tr>
 									<th>Gateway</th>
 									<th>Subscriptions</th>
-									<th>Manual Renewals</th>
 									<th>Status</th>
 								</tr>
 							</thead>
@@ -122,7 +183,6 @@
 									<tr>
 										<td>${gateway.gateway_title}</td>
 										<td>${gateway.subscription_count}</td>
-										<td>${gateway.manual_renewal_count}</td>
 										<td>
 											<span class="wcs-migrator-status ${gateway.compatible ? 'compatible' : 'incompatible'}">
 												${gateway.compatible ? 'Compatible' : 'Incompatible'}
@@ -134,11 +194,37 @@
 						</table>
 					</div>
 
+					${statusData && statusData.errors && Array.isArray(statusData.errors) && statusData.errors.length > 0 ? `
+						<div class="wcs-migrator-errors">
+							<h3>Previous Migration Errors (${statusData.errors.length})</h3>
+							<ul>
+								${statusData.errors.slice(-5).map(error => `<li>${error.message || 'Unknown error'} (${error.time || 'Unknown time'})</li>`).join('')}
+							</ul>
+						</div>
+					` : ''}
+
 					<div class="wcs-migrator-actions">
-						<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start"
-								${data.readiness.status === 'blocked' ? 'disabled' : ''}>
-							${wcsSubliumMigrator.strings.startMigration}
+						<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-products"
+								${productsDisabled ? 'disabled' : ''}
+								title="${productsDisabled ? 'Products migration is already completed or in progress' : 'Start migrating products to create plans'}">
+							${productsButtonText}
 						</button>
+						<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions"
+								${subscriptionsDisabled ? 'disabled' : ''}
+								style="margin-left: 10px;"
+								title="${subscriptionsDisabled ? 'Please complete products migration first' : 'Start migrating subscriptions'}">
+							${subscriptionsButtonText}
+						</button>
+						${statusData && statusData.products_migration && (
+							(statusData.products_migration.processed_products > 0) ||
+							(statusData.errors && Array.isArray(statusData.errors) && statusData.errors.length > 0)
+						) ? `
+							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset"
+									style="margin-left: 10px;"
+									title="Reset migration state and start fresh">
+								${wcsSubliumMigrator.strings.resetMigration || 'Reset Migration'}
+							</button>
+						` : ''}
 					</div>
 				</div>
 			`;
@@ -219,6 +305,11 @@
 							</ul>
 						</div>
 					` : ''}
+					<div class="wcs-migrator-actions">
+						<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset">
+							${wcsSubliumMigrator.strings.resetMigration || 'Reset Migration'}
+						</button>
+					</div>
 				</div>
 			`;
 
@@ -226,14 +317,14 @@
 			this.stopStatusPolling();
 		},
 
-		handleStartMigration: function(e) {
+		handleStartProductsMigration: function(e) {
 			e.preventDefault();
-			if (!confirm('Are you sure you want to start the migration? This will process all products and subscriptions in the background.')) {
+			if (!confirm('Are you sure you want to start products migration? This will process all subscription products and create plans in the background.')) {
 				return;
 			}
 
 			$.ajax({
-				url: this.apiUrl + 'start',
+				url: this.apiUrl + 'start-products',
 				method: 'POST',
 				beforeSend: function(xhr) {
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
@@ -246,7 +337,32 @@
 					}
 				},
 				error: function() {
-					WCSMigrator.showError('Failed to start migration');
+					WCSMigrator.showError('Failed to start products migration');
+				}
+			});
+		},
+
+		handleStartSubscriptionsMigration: function(e) {
+			e.preventDefault();
+			if (!confirm('Are you sure you want to start subscriptions migration? This will process all subscriptions in the background. Make sure products migration is completed first.')) {
+				return;
+			}
+
+			$.ajax({
+				url: this.apiUrl + 'start-subscriptions',
+				method: 'POST',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function(response) {
+					if (response.success) {
+						WCSMigrator.checkMigrationStatus();
+					} else {
+						WCSMigrator.showError(response.message);
+					}
+				},
+				error: function() {
+					WCSMigrator.showError('Failed to start subscriptions migration');
 				}
 			});
 		},
@@ -307,8 +423,42 @@
 			});
 		},
 
+		handleResetMigration: function(e) {
+			e.preventDefault();
+			if (!confirm('Are you sure you want to reset the migration state? This will clear all progress and errors, allowing you to start fresh.')) {
+				return;
+			}
+
+			$.ajax({
+				url: this.apiUrl + 'cancel',
+				method: 'POST',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function() {
+					WCSMigrator.stopStatusPolling();
+					WCSMigrator.loadFeasibility();
+					WCSMigrator.showSuccess('Migration state has been reset. You can now start a fresh migration.');
+				},
+				error: function() {
+					WCSMigrator.showError('Failed to reset migration state');
+				}
+			});
+		},
+
 		showError: function(message) {
 			alert(message);
+		},
+
+		showSuccess: function(message) {
+			// Create a temporary success message element
+			const $message = $('<div class="wcs-migrator-success notice notice-success is-dismissible" style="padding: 10px; margin: 10px 0;"><p>' + message + '</p></div>');
+			$('#wcs-sublium-migrator-app').prepend($message);
+			setTimeout(function() {
+				$message.fadeOut(function() {
+					$message.remove();
+				});
+			}, 5000);
 		}
 	};
 

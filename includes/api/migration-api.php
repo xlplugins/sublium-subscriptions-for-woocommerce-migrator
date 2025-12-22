@@ -68,13 +68,24 @@ class Migration_API {
 			)
 		);
 
-		// Start migration endpoint.
+		// Start products migration endpoint.
 		register_rest_route(
 			$this->namespace,
-			'/start',
+			'/start-products',
 			array(
 				'methods'             => 'POST',
-				'callback'            => array( $this, 'start_migration' ),
+				'callback'            => array( $this, 'start_products_migration' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
+
+		// Start subscriptions migration endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/start-subscriptions',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'start_subscriptions_migration' ),
 				'permission_callback' => array( $this, 'check_permissions' ),
 			)
 		);
@@ -147,14 +158,31 @@ class Migration_API {
 	}
 
 	/**
-	 * Start migration.
+	 * Start products migration.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 */
-	public function start_migration( $request ) {
+	public function start_products_migration( $request ) {
 		$scheduler = \WCS_Sublium_Migrator\Migration\Scheduler::get_instance();
-		$result = $scheduler->start_migration();
+		$result = $scheduler->start_products_migration();
+
+		if ( $result['success'] ) {
+			return new \WP_REST_Response( $result, 200 );
+		} else {
+			return new \WP_REST_Response( $result, 400 );
+		}
+	}
+
+	/**
+	 * Start subscriptions migration.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function start_subscriptions_migration( $request ) {
+		$scheduler = \WCS_Sublium_Migrator\Migration\Scheduler::get_instance();
+		$result = $scheduler->start_subscriptions_migration();
 
 		if ( $result['success'] ) {
 			return new \WP_REST_Response( $result, 200 );

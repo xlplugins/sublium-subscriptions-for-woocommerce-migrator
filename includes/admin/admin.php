@@ -129,12 +129,14 @@ class Admin {
 				'apiUrl'   => rest_url( 'wcs-sublium-migrator/v1/' ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),
 				'strings' => array(
-					'startMigration'   => __( 'Start Migration', 'wcs-sublium-migrator' ),
-					'pauseMigration'   => __( 'Pause Migration', 'wcs-sublium-migrator' ),
-					'resumeMigration'  => __( 'Resume Migration', 'wcs-sublium-migrator' ),
-					'cancelMigration'  => __( 'Cancel Migration', 'wcs-sublium-migrator' ),
-					'loading'          => __( 'Loading...', 'wcs-sublium-migrator' ),
-					'error'           => __( 'An error occurred', 'wcs-sublium-migrator' ),
+					'startProductsMigration'      => __( 'Migrate Products', 'wcs-sublium-migrator' ),
+					'startSubscriptionsMigration' => __( 'Migrate Subscriptions', 'wcs-sublium-migrator' ),
+					'pauseMigration'             => __( 'Pause Migration', 'wcs-sublium-migrator' ),
+					'resumeMigration'            => __( 'Resume Migration', 'wcs-sublium-migrator' ),
+					'cancelMigration'            => __( 'Cancel Migration', 'wcs-sublium-migrator' ),
+					'resetMigration'             => __( 'Reset Migration', 'wcs-sublium-migrator' ),
+					'loading'                     => __( 'Loading...', 'wcs-sublium-migrator' ),
+					'error'                       => __( 'An error occurred', 'wcs-sublium-migrator' ),
 				),
 			)
 		);

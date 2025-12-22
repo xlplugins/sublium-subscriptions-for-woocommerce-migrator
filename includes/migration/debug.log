@@ -1,0 +1,3724 @@
+Array
+(
+    [scheduler_process_products_batch] => Array
+        (
+            [offset] => 0
+            [time] => 2025-12-22 16:24:57
+        )
+
+)
+Array
+(
+    [process_batch_start] => Array
+        (
+            [offset] => 0
+        )
+
+)
+Array
+(
+    [current_state] => Array
+        (
+            [products_migration] => Array
+                (
+                    [total_products] => 18
+                    [processed_products] => 0
+                    [created_plans] => 0
+                    [failed_products] => 0
+                )
+
+            [subscriptions_migration] => Array
+                (
+                    [total_subscriptions] => 19
+                )
+
+            [start_time] => 2025-12-22 16:24:57
+            [errors] => Array
+                (
+                )
+
+            [status] => products_migrating
+            [last_activity] => 2025-12-22 16:24:57
+        )
+
+)
+Array
+(
+    [get_products_batch_start] => Array
+        (
+            [offset] => 0
+            [limit] => 50
+        )
+
+)
+Array
+(
+    [native_products] => Array
+        (
+            [count] => 9
+            [ids] => Array
+                (
+                    [0] => 132
+                    [1] => 133
+                    [2] => 783
+                    [3] => 1557
+                    [4] => 1558
+                    [5] => 1987
+                    [6] => 2002
+                    [7] => 3112
+                    [8] => 9117
+                )
+
+        )
+
+)
+Array
+(
+    [checking_wcsatt] => 1
+)
+Array
+(
+    [wcsatt_products] => Array
+        (
+            [count] => 9
+            [ids] => Array
+                (
+                    [0] => 5407
+                    [1] => 4914
+                    [2] => 4251
+                    [3] => 3413
+                    [4] => 3412
+                    [5] => 3110
+                    [6] => 2396
+                    [7] => 80
+                    [8] => 66
+                )
+
+        )
+
+)
+Array
+(
+    [get_products_batch_end] => Array
+        (
+            [count] => 18
+            [ids] => Array
+                (
+                    [0] => 132
+                    [1] => 133
+                    [2] => 783
+                    [3] => 1557
+                    [4] => 1558
+                    [5] => 1987
+                    [6] => 2002
+                    [7] => 3112
+                    [8] => 9117
+                    [9] => 5407
+                    [10] => 4914
+                    [11] => 4251
+                    [12] => 3413
+                    [13] => 3412
+                    [14] => 3110
+                    [15] => 2396
+                    [16] => 80
+                    [17] => 66
+                )
+
+        )
+
+)
+Array
+(
+    [products_fetched] => Array
+        (
+            [count] => 18
+            [ids] => Array
+                (
+                    [0] => 132
+                    [1] => 133
+                    [2] => 783
+                    [3] => 1557
+                    [4] => 1558
+                    [5] => 1987
+                    [6] => 2002
+                    [7] => 3112
+                    [8] => 9117
+                    [9] => 5407
+                    [10] => 4914
+                    [11] => 4251
+                    [12] => 3413
+                    [13] => 3412
+                    [14] => 3110
+                    [15] => 2396
+                    [16] => 80
+                    [17] => 66
+                )
+
+        )
+
+)
+Array
+(
+    [starting_foreach] => Array
+        (
+            [products_count] => 18
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 132
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 132
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 132
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 132
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 132
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 2
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 132
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 132
+            [plan_group_id] => 77
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 132
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 2
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 132
+            [scheme_index] => 0
+            [plan_id] => 82
+            [plan_group_id] => 77
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 132
+            [scheme_index] => 0
+            [plan_id] => 82
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 132
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 82
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 132
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 133
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 133
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 133
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 133
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 133
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 3
+                    [sign_up_fee] => 0
+                    [trial_length] => 7
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 133
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 133
+            [plan_group_id] => 78
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 133
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 3
+                    [sign_up_fee] => 0
+                    [trial_length] => 7
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 133
+            [scheme_index] => 0
+            [plan_id] => 83
+            [plan_group_id] => 78
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 133
+            [scheme_index] => 0
+            [plan_id] => 83
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 133
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 83
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 133
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 783
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 783
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 783
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 783
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 783
+            [settings] => Array
+                (
+                    [price] => 100
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 10
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 783
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 783
+            [plan_group_id] => 79
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 783
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 100
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 10
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 783
+            [scheme_index] => 0
+            [plan_id] => 84
+            [plan_group_id] => 79
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 783
+            [scheme_index] => 0
+            [plan_id] => 84
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 783
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 84
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 783
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 1557
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 1557
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 1557
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 1557
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 1557
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 10
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 1557
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 1557
+            [plan_group_id] => 80
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 1557
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 10
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 1557
+            [scheme_index] => 0
+            [plan_id] => 85
+            [plan_group_id] => 80
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 1557
+            [scheme_index] => 0
+            [plan_id] => 85
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 1557
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 85
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 1557
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 1558
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 1558
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 1558
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 1558
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 1558
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 1558
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 1558
+            [plan_group_id] => 81
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 1558
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 1558
+            [scheme_index] => 0
+            [plan_id] => 86
+            [plan_group_id] => 81
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 1558
+            [scheme_index] => 0
+            [plan_id] => 86
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 1558
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 86
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 1558
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 1987
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 1987
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 1987
+            [type] => variable-subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 1987
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 1987
+            [settings] => Array
+                (
+                    [price] => 30
+                    [period] => month
+                    [period_interval] => 3
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 1987
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 1987
+            [plan_group_id] => 82
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 1987
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 30
+                    [period] => month
+                    [period_interval] => 3
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 1987
+            [scheme_index] => 0
+            [plan_id] => 87
+            [plan_group_id] => 82
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 1987
+            [scheme_index] => 0
+            [plan_id] => 87
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 1987
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 87
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 1987
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 2002
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 2002
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 2002
+            [type] => variable-subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 2002
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 2002
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 2
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => month
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 2002
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 2002
+            [plan_group_id] => 83
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 2002
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 2
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => month
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 2002
+            [scheme_index] => 0
+            [plan_id] => 88
+            [plan_group_id] => 83
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 2002
+            [scheme_index] => 0
+            [plan_id] => 88
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 2002
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 88
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 2002
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 3112
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 3112
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 3112
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 3112
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 3112
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 5
+                    [trial_length] => 5
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 3112
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 3112
+            [plan_group_id] => 84
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 3112
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 50
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 5
+                    [trial_length] => 5
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 3112
+            [scheme_index] => 0
+            [plan_id] => 89
+            [plan_group_id] => 84
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 3112
+            [scheme_index] => 0
+            [plan_id] => 89
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 3112
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 89
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 3112
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 9117
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 9117
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 9117
+            [type] => subscription
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 9117
+            [is_wcsatt] => 
+        )
+
+)
+Array
+(
+    [native_settings] => Array
+        (
+            [product_id] => 9117
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => day
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 9117
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 9117
+            [plan_group_id] => 85
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 9117
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 10
+                    [period] => day
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 9117
+            [scheme_index] => 0
+            [plan_id] => 90
+            [plan_group_id] => 85
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 9117
+            [scheme_index] => 0
+            [plan_id] => 90
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 0
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 9117
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 90
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 9117
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 5407
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 5407
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 5407
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 5407
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 5407
+            [total_schemes] => 2
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 30
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 1
+            [period] => year
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 5407
+            [schemes_count] => 2
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 200
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 30
+                        )
+
+                    [1] => Array
+                        (
+                            [price] => 200
+                            [period] => year
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 5407
+            [plan_type] => 2
+            [is_virtual] => 1
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 5407
+            [plan_group_id] => 86
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 200
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 30
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_skipped_recurring] => Array
+        (
+            [product_id] => 5407
+            [plan_type] => 2
+            [discount] => 30
+            [reason] => Recurring plans store discount as sale_price in plan relation
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 0
+            [plan_id] => 91
+            [plan_group_id] => 86
+        )
+
+)
+Array
+(
+    [recurring_discount_calculated] => Array
+        (
+            [product_id] => 5407
+            [plan_id] => 91
+            [regular_price] => 200
+            [discount] => 30
+            [calculated_sale_price] => 140
+            [method] => wcsatt_native
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 0
+            [plan_id] => 91
+            [result] => 1
+            [plan_type] => 2
+            [discount] => 30
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 1
+            [settings] => Array
+                (
+                    [price] => 200
+                    [period] => year
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_skipped_recurring] => Array
+        (
+            [product_id] => 5407
+            [plan_type] => 2
+            [discount] => 10
+            [reason] => Recurring plans store discount as sale_price in plan relation
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 1
+            [plan_id] => 92
+            [plan_group_id] => 86
+        )
+
+)
+Array
+(
+    [recurring_discount_calculated] => Array
+        (
+            [product_id] => 5407
+            [plan_id] => 92
+            [regular_price] => 200
+            [discount] => 10
+            [calculated_sale_price] => 180
+            [method] => wcsatt_native
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 5407
+            [scheme_index] => 1
+            [plan_id] => 92
+            [result] => 1
+            [plan_type] => 2
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 5407
+            [plans_created] => 2
+            [plan_ids] => Array
+                (
+                    [0] => 91
+                    [1] => 92
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 5407
+            [result] => 2
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 4914
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 4914
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 4914
+            [type] => variable
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 4914
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 4914
+            [total_schemes] => 1
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 4914
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 4914
+            [schemes_count] => 1
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 0
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 4914
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 4914
+            [plan_group_id] => 87
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 4914
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 0
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 4914
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 4914
+            [scheme_index] => 0
+            [plan_id] => 93
+            [plan_group_id] => 87
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 4914
+            [plan_id] => 93
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 4914
+            [scheme_index] => 0
+            [plan_id] => 93
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 4914
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 93
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 4914
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 4251
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 4251
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 4251
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 4251
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 4251
+            [total_schemes] => 2
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 30
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 1
+            [period] => year
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 4251
+            [schemes_count] => 2
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 100
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 30
+                        )
+
+                    [1] => Array
+                        (
+                            [price] => 100
+                            [period] => year
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 4251
+            [plan_type] => 2
+            [is_virtual] => 1
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 4251
+            [plan_group_id] => 88
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 100
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 30
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_skipped_recurring] => Array
+        (
+            [product_id] => 4251
+            [plan_type] => 2
+            [discount] => 30
+            [reason] => Recurring plans store discount as sale_price in plan relation
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 0
+            [plan_id] => 94
+            [plan_group_id] => 88
+        )
+
+)
+Array
+(
+    [recurring_discount_calculated] => Array
+        (
+            [product_id] => 4251
+            [plan_id] => 94
+            [regular_price] => 100
+            [discount] => 30
+            [calculated_sale_price] => 70
+            [method] => wcsatt_native
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 0
+            [plan_id] => 94
+            [result] => 1
+            [plan_type] => 2
+            [discount] => 30
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 1
+            [settings] => Array
+                (
+                    [price] => 100
+                    [period] => year
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_skipped_recurring] => Array
+        (
+            [product_id] => 4251
+            [plan_type] => 2
+            [discount] => 10
+            [reason] => Recurring plans store discount as sale_price in plan relation
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 1
+            [plan_id] => 95
+            [plan_group_id] => 88
+        )
+
+)
+Array
+(
+    [recurring_discount_calculated] => Array
+        (
+            [product_id] => 4251
+            [plan_id] => 95
+            [regular_price] => 100
+            [discount] => 10
+            [calculated_sale_price] => 90
+            [method] => wcsatt_native
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 4251
+            [scheme_index] => 1
+            [plan_id] => 95
+            [result] => 1
+            [plan_type] => 2
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 4251
+            [plans_created] => 2
+            [plan_ids] => Array
+                (
+                    [0] => 94
+                    [1] => 95
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 4251
+            [result] => 2
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 3413
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 3413
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 3413
+            [type] => variable
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 3413
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 3413
+            [total_schemes] => 2
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 1
+            [period] => week
+            [period_interval] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 3413
+            [schemes_count] => 2
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 0
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                    [1] => Array
+                        (
+                            [price] => 0
+                            [period] => week
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 20
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 3413
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 3413
+            [plan_group_id] => 89
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 0
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 3413
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 0
+            [plan_id] => 96
+            [plan_group_id] => 89
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 3413
+            [plan_id] => 96
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 0
+            [plan_id] => 96
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 1
+            [settings] => Array
+                (
+                    [price] => 0
+                    [period] => week
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 20
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 3413
+            [plan_type] => 1
+            [discount] => 20
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 1
+            [plan_id] => 97
+            [plan_group_id] => 89
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 3413
+            [plan_id] => 97
+            [plan_type] => 1
+            [discount] => 20
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 3413
+            [scheme_index] => 1
+            [plan_id] => 97
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 3413
+            [plans_created] => 2
+            [plan_ids] => Array
+                (
+                    [0] => 96
+                    [1] => 97
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 3413
+            [result] => 2
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 3412
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 3412
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 3412
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 3412
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 3412
+            [total_schemes] => 1
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 3412
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 3412
+            [schemes_count] => 1
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 120
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 3412
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 3412
+            [plan_group_id] => 90
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 3412
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 120
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 3412
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 3412
+            [scheme_index] => 0
+            [plan_id] => 98
+            [plan_group_id] => 90
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 3412
+            [plan_id] => 98
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 3412
+            [scheme_index] => 0
+            [plan_id] => 98
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 3412
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 98
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 3412
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 3110
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 3110
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 3110
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 3110
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 3110
+            [total_schemes] => 1
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 3110
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 3110
+            [schemes_count] => 1
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 100
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 3110
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 3110
+            [plan_group_id] => 91
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 3110
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 100
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 3110
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 3110
+            [scheme_index] => 0
+            [plan_id] => 99
+            [plan_group_id] => 91
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 3110
+            [plan_id] => 99
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 3110
+            [scheme_index] => 0
+            [plan_id] => 99
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 3110
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 99
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 3110
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 2396
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 2396
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 2396
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 2396
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 2396
+            [total_schemes] => 2
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 5
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 1
+            [period] => week
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 2396
+            [schemes_count] => 2
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 0
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 5
+                        )
+
+                    [1] => Array
+                        (
+                            [price] => 0
+                            [period] => week
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 2396
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 2396
+            [plan_group_id] => 92
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 0
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 5
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 2396
+            [plan_type] => 1
+            [discount] => 5
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 5.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 0
+            [plan_id] => 100
+            [plan_group_id] => 92
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 2396
+            [plan_id] => 100
+            [plan_type] => 1
+            [discount] => 5
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 5.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 0
+            [plan_id] => 100
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 5
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 1
+            [settings] => Array
+                (
+                    [price] => 0
+                    [period] => week
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 2396
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 1
+            [plan_id] => 101
+            [plan_group_id] => 92
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 2396
+            [plan_id] => 101
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 2396
+            [scheme_index] => 1
+            [plan_id] => 101
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 2396
+            [plans_created] => 2
+            [plan_ids] => Array
+                (
+                    [0] => 100
+                    [1] => 101
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 2396
+            [result] => 2
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 80
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 80
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 80
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 80
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 80
+            [total_schemes] => 1
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 80
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 80
+            [schemes_count] => 1
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 18
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 20
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 80
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 80
+            [plan_group_id] => 93
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 80
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 18
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 20
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 80
+            [plan_type] => 1
+            [discount] => 20
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 80
+            [scheme_index] => 0
+            [plan_id] => 102
+            [plan_group_id] => 93
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 80
+            [plan_id] => 102
+            [plan_type] => 1
+            [discount] => 20
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 80
+            [scheme_index] => 0
+            [plan_id] => 102
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 80
+            [plans_created] => 1
+            [plan_ids] => Array
+                (
+                    [0] => 102
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 80
+            [result] => 1
+        )
+
+)
+Array
+(
+    [foreach_iteration] => Array
+        (
+            [product_id] => 66
+        )
+
+)
+Array
+(
+    [migrate_product_start] => Array
+        (
+            [product_id] => 66
+        )
+
+)
+Array
+(
+    [product_found] => Array
+        (
+            [product_id] => 66
+            [type] => simple
+        )
+
+)
+Array
+(
+    [is_wcsatt] => Array
+        (
+            [product_id] => 66
+            [is_wcsatt] => 1
+        )
+
+)
+Array
+(
+    [wcsatt_schemes_count] => Array
+        (
+            [product_id] => 66
+            [total_schemes] => 2
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 0
+            [period] => month
+            [period_interval] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [scheme_extracted] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 1
+            [period] => year
+            [period_interval] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [wcsatt_settings] => Array
+        (
+            [product_id] => 66
+            [schemes_count] => 2
+            [settings] => Array
+                (
+                    [0] => Array
+                        (
+                            [price] => 16
+                            [period] => month
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 10
+                        )
+
+                    [1] => Array
+                        (
+                            [price] => 16
+                            [period] => year
+                            [period_interval] => 1
+                            [length] => 0
+                            [sign_up_fee] => 0
+                            [trial_length] => 0
+                            [trial_period] => day
+                            [discount] => 20
+                        )
+
+                )
+
+        )
+
+)
+Array
+(
+    [plan_type] => Array
+        (
+            [product_id] => 66
+            [plan_type] => 1
+            [is_virtual] => 
+        )
+
+)
+Array
+(
+    [plan_group_created] => Array
+        (
+            [product_id] => 66
+            [plan_group_id] => 94
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 0
+            [settings] => Array
+                (
+                    [price] => 16
+                    [period] => month
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 10
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 66
+            [plan_type] => 1
+            [discount] => 10
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 0
+            [plan_id] => 103
+            [plan_group_id] => 94
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 66
+            [plan_id] => 103
+            [plan_type] => 1
+            [discount] => 10
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 10.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 0
+            [plan_id] => 103
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 10
+        )
+
+)
+Array
+(
+    [processing_scheme] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 1
+            [settings] => Array
+                (
+                    [price] => 16
+                    [period] => year
+                    [period_interval] => 1
+                    [length] => 0
+                    [sign_up_fee] => 0
+                    [trial_length] => 0
+                    [trial_period] => day
+                    [discount] => 20
+                )
+
+        )
+
+)
+Array
+(
+    [plan_offer_set] => Array
+        (
+            [product_id] => 66
+            [plan_type] => 1
+            [discount] => 20
+            [offer] => Array
+                (
+                    [price_type] => default
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_created] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 1
+            [plan_id] => 104
+            [plan_group_id] => 94
+        )
+
+)
+Array
+(
+    [plan_relation_discount_set] => Array
+        (
+            [product_id] => 66
+            [plan_id] => 104
+            [plan_type] => 1
+            [discount] => 20
+            [relation_data] => Array
+                (
+                    [discount_type] => percentage
+                    [discount_value] => 20.00
+                )
+
+        )
+
+)
+Array
+(
+    [plan_relation_created] => Array
+        (
+            [product_id] => 66
+            [scheme_index] => 1
+            [plan_id] => 104
+            [result] => 1
+            [plan_type] => 1
+            [discount] => 20
+        )
+
+)
+Array
+(
+    [migrate_product_success] => Array
+        (
+            [product_id] => 66
+            [plans_created] => 2
+            [plan_ids] => Array
+                (
+                    [0] => 103
+                    [1] => 104
+                )
+
+        )
+
+)
+Array
+(
+    [migrate_product_result] => Array
+        (
+            [product_id] => 66
+            [result] => 2
+        )
+
+)
+Array
+(
+    [scheduler_process_result] => Array
+        (
+            [success] => 1
+            [has_more] => 
+            [next_offset] => 0
+            [processed] => 18
+            [created] => 23
+            [failed] => 0
+        )
+
+)
+Array
+(
+    [products_migration_complete] => 1
+)
