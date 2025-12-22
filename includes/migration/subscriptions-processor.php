@@ -326,9 +326,6 @@ class Subscriptions_Processor {
 		// Get payment gateway.
 		$gateway = $wcs_subscription->get_payment_method();
 
-		// Get plan type from plan.
-		$plan_type = $this->get_plan_type_from_plan( $plan_id );
-
 		// Build search string.
 		$search_str = $this->build_search_string( $wcs_subscription );
 
