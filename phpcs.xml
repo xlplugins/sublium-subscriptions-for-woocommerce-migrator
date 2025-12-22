@@ -51,4 +51,9 @@
     <exclude-pattern>*.sass</exclude-pattern>
     <exclude-pattern>*.less</exclude-pattern>
 
+    <!-- Exclude file naming rule - project uses descriptive names without class- prefix -->
+    <rule ref="WordPress.Files.FileName">
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+    </rule>
+
 </ruleset>

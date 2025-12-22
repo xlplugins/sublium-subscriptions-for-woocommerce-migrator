@@ -5,6 +5,8 @@
  * @package WCS_Sublium_Migrator\Migration
  */
 
+// phpcs:ignore WordPress.Files.FileName.InvalidClassFileName -- File name matches class purpose.
+
 namespace WCS_Sublium_Migrator\Migration;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -32,7 +34,7 @@ class Products_Processor {
 	 * @return array Result.
 	 */
 	public function process_batch( $offset = 0 ) {
-		$state = new State();
+		$state         = new State();
 		$current_state = $state->get_state();
 
 		// Check if paused.
@@ -48,8 +50,8 @@ class Products_Processor {
 		$products = $this->get_products_batch( $offset, $this->batch_size );
 
 		$processed = 0;
-		$created = 0;
-		$failed = 0;
+		$created   = 0;
+		$failed    = 0;
 
 		foreach ( $products as $product_id ) {
 			try {
@@ -59,13 +61,17 @@ class Products_Processor {
 					$created += absint( $result );
 				} else {
 					++$failed;
-					$product = wc_get_product( $product_id );
-					$is_wcsatt = $this->is_wcsatt_product( $product_id );
-					$product_type = $product ? $product->get_type() : 'unknown';
+					$product       = wc_get_product( $product_id );
+					$is_wcsatt     = $this->is_wcsatt_product( $product_id );
+					$product_type  = $product ? $product->get_type() : 'unknown';
 					$error_message = sprintf( 'Failed to migrate product %d (Type: %s, WCS_ATT: %s)', $product_id, $product_type, $is_wcsatt ? 'Yes' : 'No' );
 					$state->add_error(
 						$error_message,
-						array( 'product_id' => $product_id, 'product_type' => $product_type, 'is_wcsatt' => $is_wcsatt )
+						array(
+							'product_id'   => $product_id,
+							'product_type' => $product_type,
+							'is_wcsatt'    => $is_wcsatt,
+						)
 					);
 					// Log to WordPress debug log for debugging.
 					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -78,7 +84,10 @@ class Products_Processor {
 				$error_message = sprintf( 'Error migrating product %d: %s', $product_id, $e->getMessage() );
 				$state->add_error(
 					$error_message,
-					array( 'product_id' => $product_id, 'exception' => $e->getTraceAsString() )
+					array(
+						'product_id' => $product_id,
+						'exception'  => $e->getTraceAsString(),
+					)
 				);
 				// Log to WordPress debug log for debugging.
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -90,8 +99,8 @@ class Products_Processor {
 		// Update progress.
 		$current_state = $state->get_state();
 		$new_processed = $current_state['products_migration']['processed_products'] + $processed;
-		$new_created = $current_state['products_migration']['created_plans'] + $created;
-		$new_failed = $current_state['products_migration']['failed_products'] + $failed;
+		$new_created   = $current_state['products_migration']['created_plans'] + $created;
+		$new_failed    = $current_state['products_migration']['failed_products'] + $failed;
 
 		$state->update_products_progress(
 			array(
@@ -104,16 +113,16 @@ class Products_Processor {
 		);
 
 		// Check if more products exist.
-		$has_more = count( $products ) === $this->batch_size;
+		$has_more    = count( $products ) === $this->batch_size;
 		$next_offset = $has_more ? $offset + $this->batch_size : 0;
 
 		return array(
-			'success'    => true,
-			'has_more'   => $has_more,
+			'success'     => true,
+			'has_more'    => $has_more,
 			'next_offset' => $next_offset,
-			'processed'  => $processed,
-			'created'    => $created,
-			'failed'     => $failed,
+			'processed'   => $processed,
+			'created'     => $created,
+			'failed'      => $failed,
 		);
 	}
 
@@ -130,10 +139,10 @@ class Products_Processor {
 		// Get native subscription products using WooCommerce native function.
 		$native_products = wc_get_products(
 			array(
-				'type'   => array( 'subscription', 'variable-subscription' ),
-				'status' => 'publish',
-				'limit'  => $limit,
-				'offset' => $offset,
+				'type'    => array( 'subscription', 'variable-subscription' ),
+				'status'  => 'publish',
+				'limit'   => $limit,
+				'offset'  => $offset,
 				'orderby' => 'ID',
 				'order'   => 'ASC',
 				'return'  => 'ids',
@@ -145,7 +154,7 @@ class Products_Processor {
 		}
 
 		// If we have WCS_ATT products and haven't processed them yet, include them.
-		if ( class_exists( '\WCS_ATT' ) && $offset === 0 ) {
+		if ( class_exists( '\WCS_ATT' ) && 0 === $offset ) {
 			// Get all published products to check for WCS_ATT schemes.
 			$all_products = wc_get_products(
 				array(
@@ -307,7 +316,7 @@ class Products_Processor {
 
 		// Step 1: Collect all unique schemes from the variable product.
 		// Check if parent product is WCS_ATT product.
-		$is_wcsatt = $this->is_wcsatt_product( $product_id );
+		$is_wcsatt          = $this->is_wcsatt_product( $product_id );
 		$all_unique_schemes = array();
 
 		if ( $is_wcsatt ) {
@@ -426,9 +435,9 @@ class Products_Processor {
 	 * @return string Scheme key.
 	 */
 	private function get_scheme_key( $settings ) {
-		$interval = $this->convert_period_to_interval( $settings['period'] ?? 'month' );
-		$frequency = absint( $settings['period_interval'] ?? 1 );
-		$length = absint( $settings['length'] ?? 0 );
+		$interval   = $this->convert_period_to_interval( $settings['period'] ?? 'month' );
+		$frequency  = absint( $settings['period_interval'] ?? 1 );
+		$length     = absint( $settings['length'] ?? 0 );
 		$trial_days = $this->convert_trial_to_days( $settings['trial_length'] ?? 0, $settings['trial_period'] ?? 'day' );
 
 		return sprintf( '%d_%d_%d_%d', $frequency, $interval, $length, $trial_days );
@@ -448,7 +457,7 @@ class Products_Processor {
 		}
 
 		$plan_relations = new \Sublium_WCS\Includes\database\PlanRelations();
-		$relations = $plan_relations->read(
+		$relations      = $plan_relations->read(
 			array(
 				'plan_id' => absint( $plan_id ),
 				'oid'     => absint( $product_id ),
@@ -553,7 +562,7 @@ class Products_Processor {
 			}
 
 			// Extract settings from scheme - handle different key formats.
-			$price = 0;
+			$price          = 0;
 			$pricing_method = isset( $scheme['subscription_pricing_method'] ) ? $scheme['subscription_pricing_method'] : 'inherit';
 
 			// If pricing method is 'inherit', use regular product price.
@@ -772,13 +781,13 @@ class Products_Processor {
 		}
 
 		// Convert period to interval.
-		$interval = $this->convert_period_to_interval( $settings['period'] );
-		$frequency = absint( $settings['period_interval'] );
+		$interval   = $this->convert_period_to_interval( $settings['period'] );
+		$frequency  = absint( $settings['period_interval'] );
 		$trial_days = $this->convert_trial_to_days( $settings['trial_length'], $settings['trial_period'] );
 
 		// First, find plan relations for this product/variation.
 		$plan_relations = new \Sublium_WCS\Includes\database\PlanRelations();
-		$relations = $plan_relations->read(
+		$relations      = $plan_relations->read(
 			array(
 				'oid'    => absint( $product_id ),
 				'vid'    => absint( $variation_id ),
@@ -816,8 +825,8 @@ class Products_Processor {
 
 			// Check if billing settings match.
 			if ( isset( $plan['billing_frequency'] ) && absint( $plan['billing_frequency'] ) === $frequency &&
-				 isset( $plan['billing_interval'] ) && absint( $plan['billing_interval'] ) === $interval &&
-				 isset( $plan['free_trial'] ) && absint( $plan['free_trial'] ) === $trial_days ) {
+				isset( $plan['billing_interval'] ) && absint( $plan['billing_interval'] ) === $interval &&
+				isset( $plan['free_trial'] ) && absint( $plan['free_trial'] ) === $trial_days ) {
 				return absint( $plan_id );
 			}
 		}
@@ -837,7 +846,7 @@ class Products_Processor {
 			return false;
 		}
 
-		$group_db = new \Sublium_WCS\Includes\database\GroupPlans();
+		$group_db    = new \Sublium_WCS\Includes\database\GroupPlans();
 		$group_title = $product->get_name();
 
 		$group_data = array(
@@ -866,9 +875,9 @@ class Products_Processor {
 		$plan_db = new \Sublium_WCS\Includes\database\Plan();
 
 		// Convert period to interval.
-		$interval = $this->convert_period_to_interval( $settings['period'] );
-		$frequency = absint( $settings['period_interval'] );
-		$length = absint( $settings['length'] );
+		$interval   = $this->convert_period_to_interval( $settings['period'] );
+		$frequency  = absint( $settings['period_interval'] );
+		$length     = absint( $settings['length'] );
 		$trial_days = $this->convert_trial_to_days( $settings['trial_length'], $settings['trial_period'] );
 
 		// Format signup fee as JSON.
@@ -876,7 +885,7 @@ class Products_Processor {
 		if ( ! empty( $settings['sign_up_fee'] ) && $settings['sign_up_fee'] > 0 ) {
 			$signup_fee = array(
 				'signup_fee_type' => 'fixed',
-				'signup_amount' => number_format( (float) $settings['sign_up_fee'], 2, '.', '' ),
+				'signup_amount'   => number_format( (float) $settings['sign_up_fee'], 2, '.', '' ),
 			);
 		}
 
@@ -944,7 +953,7 @@ class Products_Processor {
 			$product = wc_get_product( $product_id );
 			if ( $product ) {
 				$regular_price = $product->get_regular_price();
-				$sale_price = $product->get_sale_price();
+				$sale_price    = $product->get_sale_price();
 
 				// If there's a discount from WCS_ATT scheme, calculate discounted price.
 				// Use WCS_ATT native function if available, otherwise calculate manually.
@@ -973,10 +982,11 @@ class Products_Processor {
 					}
 
 					// If WCS_ATT function didn't work, calculate manually using WCS_ATT formula.
-					// Formula: regular_price * (100 - discount) / 100
+					// Formula: regular_price * (100 - discount) / 100.
+					// phpcs:ignore WordPress.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- Variable is checked, not assigned.
 					if ( null === $discounted_price ) {
 						$discount_percentage = (float) $settings['discount'];
-						$discounted_price = round( (float) $regular_price * ( 100 - $discount_percentage ) / 100, wc_get_price_decimals() );
+						$discounted_price    = round( (float) $regular_price * ( 100 - $discount_percentage ) / 100, wc_get_price_decimals() );
 					}
 
 					// Only set sale_price if discounted price is less than regular price.
@@ -1070,10 +1080,12 @@ class Products_Processor {
 
 		$interval_name = isset( $interval_names[ $interval ] ) ? $interval_names[ $interval ] : __( 'Month', 'wcs-sublium-migrator' );
 
-		if ( $frequency === 1 ) {
+		if ( 1 === $frequency ) {
+			/* translators: %s: interval name (e.g., Month, Year) */
 			return sprintf( __( 'Every %s', 'wcs-sublium-migrator' ), $interval_name );
 		} else {
-			return sprintf( __( 'Every %d %ss', 'wcs-sublium-migrator' ), $frequency, $interval_name );
+			/* translators: %1$d: frequency number, %2$s: interval name (e.g., Every 2 Months) */
+			return sprintf( __( 'Every %1$d %2$ss', 'wcs-sublium-migrator' ), $frequency, $interval_name );
 		}
 	}
 }
