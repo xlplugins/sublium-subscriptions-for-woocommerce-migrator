@@ -274,13 +274,16 @@ class Subscriptions_Processor {
 		// Create or get plan from subscription data.
 		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_creating_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		$plan_id = $this->create_plan_from_subscription( $wcs_subscription, $parent_order );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		$plan_result = $this->create_plan_from_subscription( $wcs_subscription, $parent_order );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_result' => $plan_result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		if ( ! $plan_id ) {
+		if ( empty( $plan_result ) || ! is_array( $plan_result ) || ! isset( $plan_result['plan_id'] ) ) {
 			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_plan_creation_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
+
+		$plan_id   = absint( $plan_result['plan_id'] );
+		$plan_type = isset( $plan_result['plan_type'] ) ? absint( $plan_result['plan_type'] ) : 1;
 
 		// Get dates.
 		$next_payment_date = $wcs_subscription->get_date( 'next_payment' );
@@ -324,6 +327,9 @@ class Subscriptions_Processor {
 		// Get payment gateway.
 		$gateway = $wcs_subscription->get_payment_method();
 
+		// Get plan type from plan.
+		$plan_type = $this->get_plan_type_from_plan( $plan_id );
+
 		// Build search string.
 		$search_str = $this->build_search_string( $wcs_subscription );
 
@@ -344,6 +350,7 @@ class Subscriptions_Processor {
 			'trial_length'      => absint( $wcs_subscription->get_trial_length() ),
 			'trial_period'      => $wcs_subscription->get_trial_period(),
 			'signup_fee'        => (float) $wcs_subscription->get_sign_up_fee(),
+			'plan_data'         => $plan_data, // Store plan_data in meta for recurring payments.
 		);
 
 		// Add billing and shipping details.
@@ -374,7 +381,7 @@ class Subscriptions_Processor {
 			'gateway_mode'          => 1,
 			'user_id'               => absint( $user_id ),
 			'status'                => $status,
-			'plan_id'               => array( (string) $plan_id ),
+			'plan_id'               => array( '0' ), // Set to 0 when using plan_data.
 			'plan_type'             => $plan_type,
 			'currency'              => $currency,
 			'totals'                => $totals,
@@ -391,13 +398,13 @@ class Subscriptions_Processor {
 	}
 
 	/**
-	 * Create plan from WCS subscription data.
+	 * Create plan_data from WCS subscription data (no actual plan creation).
 	 *
 	 * @param \WC_Subscription $wcs_subscription WooCommerce Subscription object.
 	 * @param \WC_Order        $parent_order Parent order object.
-	 * @return int|false Plan ID or false.
+	 * @return array|false Plan data array or false.
 	 */
-	private function create_plan_from_subscription( $wcs_subscription, $parent_order ) {
+	private function create_plan_data_from_subscription( $wcs_subscription, $parent_order ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
 		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
@@ -565,7 +572,10 @@ class Subscriptions_Processor {
 			}
 		}
 
-		return absint( $plan_id );
+		return array(
+			'plan_id'   => absint( $plan_id ),
+			'plan_type' => absint( $plan_type ),
+		);
 	}
 
 	/**
