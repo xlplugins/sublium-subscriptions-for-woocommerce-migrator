@@ -652,7 +652,6 @@ class Products_Processor {
 				'discount_type'  => 'percentage',
 				'discount_value' => number_format( (float) $settings['discount'], 2, '.', '' ),
 			);
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'plan_relation_discount_set' => array( 'product_id' => $product_id, 'plan_id' => $plan_id, 'plan_type' => $plan_type, 'discount' => $settings['discount'], 'relation_data' => $relation_data_field ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 
 		// For Type 2 (Recurring), store regular/sale price in relation data.
@@ -699,8 +698,6 @@ class Products_Processor {
 					if ( $discounted_price < $regular_price ) {
 						$sale_price = $discounted_price;
 					}
-
-					file_put_contents( __DIR__ . '/debug.log', print_r( array( 'recurring_discount_calculated' => array( 'product_id' => $product_id, 'plan_id' => $plan_id, 'regular_price' => $regular_price, 'discount' => $settings['discount'], 'calculated_sale_price' => $sale_price, 'method' => class_exists( '\WCS_ATT_Product_Prices' ) ? 'wcsatt_native' : 'manual' ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				}
 
 				$relation_data_field = array(
