@@ -255,25 +255,8 @@ class Subscriptions_Processor {
 		$wcs_subscription->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
 		$wcs_subscription->save();
 
-		// Link parent order to Sublium subscription.
-		$parent_order = $wcs_subscription->get_parent();
-		if ( $parent_order ) {
-			$parent_order->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
-			$parent_order->save();
-		}
-
-		// Link renewal orders to Sublium subscription.
-		$renewal_order_ids = $wcs_subscription->get_related_orders( 'ids', 'renewal' );
-		if ( ! empty( $renewal_order_ids ) ) {
-			foreach ( $renewal_order_ids as $renewal_order_id ) {
-				$renewal_order = wc_get_order( $renewal_order_id );
-				if ( $renewal_order ) {
-					$renewal_order->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
-					$renewal_order->update_meta_data( '_sublium_wcs_subscription_renewal', 'yes' );
-					$renewal_order->save();
-				}
-			}
-		}
+		// Link parent order and renewal orders to Sublium subscription using direct database query.
+		$this->link_orders_to_sublium_subscription( $wcs_subscription, $sublium_subscription_id );
 
 		// Create activity log.
 		if ( class_exists( '\Sublium_WCS\Includes\Helpers\Subscription' ) ) {
@@ -837,6 +820,166 @@ class Subscriptions_Processor {
 		// Update subscription items field with collected item IDs.
 		if ( ! empty( $item_ids ) ) {
 			$sublium_subscription->update_items( $item_ids );
+		}
+	}
+
+	/**
+	 * Link parent order and renewal orders to Sublium subscription using direct database queries.
+	 *
+	 * @param \WC_Subscription $wcs_subscription WooCommerce Subscription object.
+	 * @param int              $sublium_subscription_id Sublium subscription ID.
+	 * @return void
+	 */
+	private function link_orders_to_sublium_subscription( $wcs_subscription, $sublium_subscription_id ) {
+		global $wpdb;
+
+		$wcs_subscription_id = $wcs_subscription->get_id();
+		$parent_order_id     = $wcs_subscription->get_parent_id();
+
+		// Check if HPOS is enabled.
+		$is_hpos = function_exists( 'wcs_is_custom_order_tables_usage_enabled' ) && wcs_is_custom_order_tables_usage_enabled();
+
+		$order_ids = array();
+
+		// Get parent order ID.
+		if ( ! empty( $parent_order_id ) ) {
+			$order_ids[] = absint( $parent_order_id );
+		}
+
+		// Get renewal orders using direct database query.
+		if ( $is_hpos ) {
+			// HPOS mode: Query wc_orders_meta table.
+			$renewal_order_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT order_id 
+					FROM {$wpdb->prefix}wc_orders_meta 
+					WHERE meta_key = %s 
+					AND meta_value = %s",
+					'_subscription_renewal',
+					$wcs_subscription_id
+				)
+			);
+		} else {
+			// CPT mode: Query postmeta table.
+			$renewal_order_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT post_id 
+					FROM {$wpdb->postmeta} 
+					WHERE meta_key = %s 
+					AND meta_value = %s",
+					'_subscription_renewal',
+					$wcs_subscription_id
+				)
+			);
+		}
+
+		if ( ! empty( $renewal_order_ids ) ) {
+			$order_ids = array_merge( $order_ids, array_map( 'absint', $renewal_order_ids ) );
+		}
+
+		// Remove duplicates.
+		$order_ids = array_unique( $order_ids );
+
+		if ( empty( $order_ids ) ) {
+			return;
+		}
+
+		// Update meta for all orders in bulk.
+		foreach ( $order_ids as $order_id ) {
+			$order_id = absint( $order_id );
+			if ( empty( $order_id ) ) {
+				continue;
+			}
+
+			// Check if this is a renewal order.
+			$is_renewal = in_array( $order_id, array_map( 'absint', $renewal_order_ids ), true );
+
+			if ( $is_hpos ) {
+				// HPOS mode: Update wc_orders_meta table.
+				// Check if meta already exists.
+				$existing_meta = $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT meta_id 
+						FROM {$wpdb->prefix}wc_orders_meta 
+						WHERE order_id = %d 
+						AND meta_key = %s 
+						LIMIT 1",
+						$order_id,
+						'_sublium_wcs_subscription_id'
+					)
+				);
+
+				if ( $existing_meta ) {
+					// Update existing meta.
+					$wpdb->update(
+						$wpdb->prefix . 'wc_orders_meta',
+						array( 'meta_value' => $sublium_subscription_id ),
+						array(
+							'order_id' => $order_id,
+							'meta_key' => '_sublium_wcs_subscription_id',
+						),
+						array( '%d' ),
+						array( '%d', '%s' )
+					);
+				} else {
+					// Insert new meta.
+					$wpdb->insert(
+						$wpdb->prefix . 'wc_orders_meta',
+						array(
+							'order_id'   => $order_id,
+							'meta_key'   => '_sublium_wcs_subscription_id',
+							'meta_value' => $sublium_subscription_id,
+						),
+						array( '%d', '%s', '%d' )
+					);
+				}
+
+				// Add renewal flag if this is a renewal order.
+				if ( $is_renewal ) {
+					$existing_renewal_meta = $wpdb->get_var(
+						$wpdb->prepare(
+							"SELECT meta_id 
+							FROM {$wpdb->prefix}wc_orders_meta 
+							WHERE order_id = %d 
+							AND meta_key = %s 
+							LIMIT 1",
+							$order_id,
+							'_sublium_wcs_subscription_renewal'
+						)
+					);
+
+					if ( $existing_renewal_meta ) {
+						$wpdb->update(
+							$wpdb->prefix . 'wc_orders_meta',
+							array( 'meta_value' => 'yes' ),
+							array(
+								'order_id' => $order_id,
+								'meta_key' => '_sublium_wcs_subscription_renewal',
+							),
+							array( '%s' ),
+							array( '%d', '%s' )
+						);
+					} else {
+						$wpdb->insert(
+							$wpdb->prefix . 'wc_orders_meta',
+							array(
+								'order_id'   => $order_id,
+								'meta_key'   => '_sublium_wcs_subscription_renewal',
+								'meta_value' => 'yes',
+							),
+							array( '%d', '%s', '%s' )
+						);
+					}
+				}
+			} else {
+				// CPT mode: Update postmeta table.
+				update_post_meta( $order_id, '_sublium_wcs_subscription_id', $sublium_subscription_id );
+
+				// Add renewal flag if this is a renewal order.
+				if ( $is_renewal ) {
+					update_post_meta( $order_id, '_sublium_wcs_subscription_renewal', 'yes' );
+				}
+			}
 		}
 	}
 
