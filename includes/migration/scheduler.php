@@ -260,7 +260,23 @@ class Scheduler {
 	 * @return void
 	 */
 	public function schedule_subscriptions_batch( $offset = 0 ) {
-		wp_schedule_single_event( time(), 'wcs_sublium_migrate_subscriptions_batch', array( $offset ) );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_subscriptions_batch' => array( 'offset' => $offset, 'timestamp' => time() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		// Check if already scheduled.
+		$scheduled = wp_next_scheduled( 'wcs_sublium_migrate_subscriptions_batch', array( $offset ) );
+		if ( $scheduled ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_already_scheduled' => array( 'offset' => $offset, 'scheduled_time' => $scheduled ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return;
+		}
+
+		$result = wp_schedule_single_event( time(), 'wcs_sublium_migrate_subscriptions_batch', array( $offset ) );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_schedule_result' => array( 'offset' => $offset, 'result' => $result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		// Trigger cron immediately if possible (for testing).
+		$disable_cron = defined( 'DISABLE_WP_CRON' ) && constant( 'DISABLE_WP_CRON' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core constant
+		if ( ! $disable_cron ) {
+			spawn_cron();
+		}
 	}
 
 	/**
@@ -295,8 +311,12 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_subscriptions_batch( $offset = 0 ) {
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_subscriptions_batch' => array( 'offset' => $offset, 'time' => current_time( 'mysql' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		$processor = new Subscriptions_Processor();
 		$result = $processor->process_batch( $offset );
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_subscriptions_process_result' => $result ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
@@ -308,6 +328,7 @@ class Scheduler {
 			$current_state = $state->get_state();
 			$current_state['end_time'] = current_time( 'mysql' );
 			$state->update_state( $current_state );
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_migration_complete' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 	}
 
