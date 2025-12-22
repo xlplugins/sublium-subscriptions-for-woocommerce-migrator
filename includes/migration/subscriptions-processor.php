@@ -254,19 +254,31 @@ class Subscriptions_Processor {
 	 * @return array|false Subscription data array or false.
 	 */
 	private function extract_subscription_data( $wcs_subscription ) {
+		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_subscription_data_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( ! is_a( $wcs_subscription, 'WC_Subscription' ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_not_wc_subscription' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
 		// Get parent order.
 		$parent_order = $wcs_subscription->get_parent();
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_parent_order_check' => array( 'subscription_id' => $subscription_id, 'has_parent' => ! empty( $parent_order ), 'parent_id' => $parent_order ? $parent_order->get_id() : 0 ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( ! $parent_order ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_no_parent_order' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
 		// Find matching Sublium plan.
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_finding_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		$plan_id = $this->find_matching_plan( $wcs_subscription );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_find_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( ! $plan_id ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_no_matching_plan' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -388,7 +400,11 @@ class Subscriptions_Processor {
 	 * @return int|false Plan ID or false.
 	 */
 	private function find_matching_plan( $wcs_subscription ) {
+		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_matching_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) || ! class_exists( '\Sublium_WCS\Includes\database\Plan' ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_classes_not_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -406,7 +422,10 @@ class Subscriptions_Processor {
 			}
 		}
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_product_ids' => array( 'subscription_id' => $subscription_id, 'product_ids' => $product_ids, 'variation_ids' => $variation_ids ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( empty( $product_ids ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -416,10 +435,14 @@ class Subscriptions_Processor {
 		$trial_length     = absint( $wcs_subscription->get_trial_length() );
 		$trial_period     = $wcs_subscription->get_trial_period();
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'trial_length' => $trial_length, 'trial_period' => $trial_period ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		// Convert to Sublium format.
 		$interval   = $this->convert_period_to_interval( $billing_period );
 		$frequency  = $billing_interval;
 		$trial_days = $this->convert_trial_to_days( $trial_length, $trial_period );
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_converted' => array( 'subscription_id' => $subscription_id, 'interval' => $interval, 'frequency' => $frequency, 'trial_days' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Find plan relations for products/variations.
 		$plan_relations_db = new \Sublium_WCS\Includes\database\PlanRelations();
@@ -435,6 +458,8 @@ class Subscriptions_Processor {
 					'status' => 1,
 				)
 			);
+
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_product_relations' => array( 'subscription_id' => $subscription_id, 'product_id' => $product_id, 'relations_count' => is_array( $relations ) ? count( $relations ) : 0, 'relations' => $relations ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 			if ( ! empty( $relations ) && is_array( $relations ) ) {
 				foreach ( $relations as $relation ) {
@@ -459,6 +484,8 @@ class Subscriptions_Processor {
 						)
 					);
 
+					file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_variation_relations' => array( 'subscription_id' => $subscription_id, 'product_id' => $product_id, 'variation_id' => $variation_id, 'relations_count' => is_array( $relations ) ? count( $relations ) : 0, 'relations' => $relations ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 					if ( ! empty( $relations ) && is_array( $relations ) ) {
 						foreach ( $relations as $relation ) {
 							if ( isset( $relation['plan_id'] ) ) {
@@ -470,7 +497,10 @@ class Subscriptions_Processor {
 			}
 		}
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_collected_plan_ids' => array( 'subscription_id' => $subscription_id, 'plan_ids' => array_unique( $plan_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( empty( $plan_ids ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_plan_ids_found' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -484,14 +514,18 @@ class Subscriptions_Processor {
 
 			$plan = $plan_data[0];
 
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_checking_plan' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'plan_billing_frequency' => isset( $plan['billing_frequency'] ) ? $plan['billing_frequency'] : 'not_set', 'plan_billing_interval' => isset( $plan['billing_interval'] ) ? $plan['billing_interval'] : 'not_set', 'plan_free_trial' => isset( $plan['free_trial'] ) ? $plan['free_trial'] : 'not_set', 'expected_frequency' => $frequency, 'expected_interval' => $interval, 'expected_trial' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 			// Check if billing settings match.
 			if ( isset( $plan['billing_frequency'] ) && absint( $plan['billing_frequency'] ) === $frequency &&
 				isset( $plan['billing_interval'] ) && absint( $plan['billing_interval'] ) === $interval &&
 				isset( $plan['free_trial'] ) && absint( $plan['free_trial'] ) === $trial_days ) {
+				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_match_found' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				return absint( $plan_id );
 			}
 		}
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_match' => array( 'subscription_id' => $subscription_id, 'checked_plan_ids' => array_unique( $plan_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		return false;
 	}
 
