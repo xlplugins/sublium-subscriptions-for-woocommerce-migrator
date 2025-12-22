@@ -338,12 +338,19 @@ class Subscriptions_Processor {
 			}
 		}
 
-		// Get billing length from product if not already set.
+		// Get subscription details from product (subscription doesn't have get_length, get_trial_length, etc. methods).
 		$billing_length_meta = 0;
-		if ( ! empty( $product_ids ) && function_exists( 'WC_Subscriptions_Product::get_length' ) ) {
-			$first_product = wc_get_product( $product_ids[0] );
+		$trial_length_meta   = 0;
+		$trial_period_meta   = '';
+		$signup_fee_meta     = 0.0;
+		
+		if ( ! empty( $item_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
+			$first_product = wc_get_product( absint( $item_ids[0] ) );
 			if ( $first_product ) {
 				$billing_length_meta = absint( \WC_Subscriptions_Product::get_length( $first_product ) );
+				$trial_length_meta   = absint( \WC_Subscriptions_Product::get_trial_length( $first_product ) );
+				$trial_period_meta   = \WC_Subscriptions_Product::get_trial_period( $first_product );
+				$signup_fee_meta     = (float) \WC_Subscriptions_Product::get_sign_up_fee( $first_product );
 			}
 		}
 
@@ -352,9 +359,9 @@ class Subscriptions_Processor {
 			'billing_frequency' => absint( $billing_interval ),
 			'billing_interval'  => $this->convert_period_to_interval( $billing_period ),
 			'billing_length'    => $billing_length_meta,
-			'trial_length'      => absint( $wcs_subscription->get_trial_length() ),
-			'trial_period'      => $wcs_subscription->get_trial_period(),
-			'signup_fee'        => (float) $wcs_subscription->get_sign_up_fee(),
+			'trial_length'      => $trial_length_meta,
+			'trial_period'      => $trial_period_meta,
+			'signup_fee'        => $signup_fee_meta,
 			'plan_data'         => $plan_data, // Store plan_data in meta for recurring payments.
 		);
 
@@ -433,19 +440,22 @@ class Subscriptions_Processor {
 		// Get billing information from subscription.
 		$billing_period   = $wcs_subscription->get_billing_period();
 		$billing_interval = absint( $wcs_subscription->get_billing_interval() );
-		
-		// Get length from product (subscription doesn't have get_length method).
+
+		// Get subscription details from product (subscription doesn't have get_length, get_trial_length, etc. methods).
 		$billing_length = 0;
+		$trial_length   = 0;
+		$trial_period   = '';
+		$signup_fee     = 0.0;
+		
 		if ( ! empty( $product_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
 			$first_product = wc_get_product( $product_ids[0] );
 			if ( $first_product ) {
 				$billing_length = absint( \WC_Subscriptions_Product::get_length( $first_product ) );
+				$trial_length   = absint( \WC_Subscriptions_Product::get_trial_length( $first_product ) );
+				$trial_period   = \WC_Subscriptions_Product::get_trial_period( $first_product );
+				$signup_fee     = (float) \WC_Subscriptions_Product::get_sign_up_fee( $first_product );
 			}
 		}
-		
-		$trial_length     = absint( $wcs_subscription->get_trial_length() );
-		$trial_period     = $wcs_subscription->get_trial_period();
-		$signup_fee       = (float) $wcs_subscription->get_sign_up_fee();
 
 		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'billing_length' => $billing_length, 'trial_length' => $trial_length, 'trial_period' => $trial_period, 'signup_fee' => $signup_fee ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
@@ -588,8 +598,18 @@ class Subscriptions_Processor {
 		// Get billing period and interval.
 		$billing_period   = $wcs_subscription->get_billing_period();
 		$billing_interval = absint( $wcs_subscription->get_billing_interval() );
-		$trial_length     = absint( $wcs_subscription->get_trial_length() );
-		$trial_period     = $wcs_subscription->get_trial_period();
+		
+		// Get trial details from product (subscription doesn't have get_trial_length, get_trial_period methods).
+		$trial_length = 0;
+		$trial_period = '';
+		
+		if ( ! empty( $product_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
+			$first_product = wc_get_product( $product_ids[0] );
+			if ( $first_product ) {
+				$trial_length = absint( \WC_Subscriptions_Product::get_trial_length( $first_product ) );
+				$trial_period = \WC_Subscriptions_Product::get_trial_period( $first_product );
+			}
+		}
 
 		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'trial_length' => $trial_length, 'trial_period' => $trial_period ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
