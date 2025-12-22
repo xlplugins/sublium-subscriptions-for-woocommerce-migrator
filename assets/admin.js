@@ -233,56 +233,83 @@
 		},
 
 		renderProgress: function(data) {
-			const productsProgress = data.progress.products || 0;
-			const subscriptionsProgress = data.progress.subscriptions || 0;
+			const productsProgress = (data.progress && data.progress.products) ? data.progress.products : 0;
+			const subscriptionsProgress = (data.progress && data.progress.subscriptions) ? data.progress.subscriptions : 0;
+
+			// Safely get products migration data
+			const productsMigration = data.products_migration || {};
+			const productsProcessed = productsMigration.processed_products || 0;
+			const productsTotal = productsMigration.total_products || 0;
+			const productsCreated = productsMigration.created_plans || 0;
+			const productsFailed = productsMigration.failed_products || 0;
+
+			// Safely get subscriptions migration data
+			const subscriptionsMigration = data.subscriptions_migration || {};
+			const subscriptionsProcessed = subscriptionsMigration.processed_subscriptions || 0;
+			const subscriptionsTotal = subscriptionsMigration.total_subscriptions || 0;
+			const subscriptionsCreated = subscriptionsMigration.created_subscriptions || 0;
+			const subscriptionsFailed = subscriptionsMigration.failed_subscriptions || 0;
+
+			// Determine which migration is active
+			const isProductsActive = data.status === 'products_migrating';
+			const isSubscriptionsActive = data.status === 'subscriptions_migrating';
+			const isPaused = data.status === 'paused';
 
 			const html = `
 				<div class="wcs-migrator-feasibility">
 					<h2>Migration Progress</h2>
 
-					<div class="wcs-migrator-progress">
-						<div class="wcs-migrator-progress-label">
-							Products Migration: ${data.products_migration.processed_products} / ${data.products_migration.total_products}
-						</div>
-						<div class="wcs-migrator-progress-bar">
-							<div class="wcs-migrator-progress-fill" style="width: ${productsProgress}%">
-								${Math.round(productsProgress)}%
+					${(productsTotal > 0 || isProductsActive) ? `
+						<div class="wcs-migrator-progress">
+							<div class="wcs-migrator-progress-label">
+								Products Migration: ${productsProcessed} / ${productsTotal}
+								${productsCreated > 0 ? ` (${productsCreated} plans created)` : ''}
+								${productsFailed > 0 ? ` (${productsFailed} failed)` : ''}
+							</div>
+							<div class="wcs-migrator-progress-bar">
+								<div class="wcs-migrator-progress-fill" style="width: ${productsProgress}%">
+									${Math.round(productsProgress)}%
+								</div>
 							</div>
 						</div>
-					</div>
+					` : ''}
 
-					<div class="wcs-migrator-progress">
-						<div class="wcs-migrator-progress-label">
-							Subscriptions Migration: ${data.subscriptions_migration.processed_subscriptions} / ${data.subscriptions_migration.total_subscriptions}
-						</div>
-						<div class="wcs-migrator-progress-bar">
-							<div class="wcs-migrator-progress-fill" style="width: ${subscriptionsProgress}%">
-								${Math.round(subscriptionsProgress)}%
+					${(subscriptionsTotal > 0 || isSubscriptionsActive) ? `
+						<div class="wcs-migrator-progress">
+							<div class="wcs-migrator-progress-label">
+								Subscriptions Migration: ${subscriptionsProcessed} / ${subscriptionsTotal}
+								${subscriptionsCreated > 0 ? ` (${subscriptionsCreated} subscriptions created)` : ''}
+								${subscriptionsFailed > 0 ? ` (${subscriptionsFailed} failed)` : ''}
+							</div>
+							<div class="wcs-migrator-progress-bar">
+								<div class="wcs-migrator-progress-fill" style="width: ${subscriptionsProgress}%">
+									${Math.round(subscriptionsProgress)}%
+								</div>
 							</div>
 						</div>
-					</div>
+					` : ''}
 
-					${data.errors && data.errors.length > 0 ? `
+					${data.errors && Array.isArray(data.errors) && data.errors.length > 0 ? `
 						<div class="wcs-migrator-errors">
 							<h3>Errors (${data.errors.length})</h3>
 							<ul>
-								${data.errors.slice(-5).map(error => `<li>${error.message} (${error.time})</li>`).join('')}
+								${data.errors.slice(-5).map(error => `<li>${error.message || 'Unknown error'} (${error.time || 'Unknown time'})</li>`).join('')}
 							</ul>
 						</div>
 					` : ''}
 
 					<div class="wcs-migrator-actions">
-						${data.status === 'paused' ? `
+						${isPaused ? `
 							<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-resume">
-								${wcsSubliumMigrator.strings.resumeMigration}
+								${wcsSubliumMigrator.strings.resumeMigration || 'Resume Migration'}
 							</button>
-						` : `
+						` : (isProductsActive || isSubscriptionsActive) ? `
 							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-pause">
-								${wcsSubliumMigrator.strings.pauseMigration}
+								${wcsSubliumMigrator.strings.pauseMigration || 'Pause Migration'}
 							</button>
-						`}
+						` : ''}
 						<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-cancel">
-							${wcsSubliumMigrator.strings.cancelMigration}
+							${wcsSubliumMigrator.strings.cancelMigration || 'Cancel Migration'}
 						</button>
 					</div>
 				</div>
