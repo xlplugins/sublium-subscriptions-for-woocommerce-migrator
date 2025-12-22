@@ -1,0 +1,26 @@
+Array
+(
+    [scheduler_process_products_batch] => Array
+        (
+            [offset] => 0
+            [time] => 2025-12-22 16:43:11
+        )
+
+)
+Array
+(
+    [scheduler_process_result] => Array
+        (
+            [success] => 1
+            [has_more] => 
+            [next_offset] => 0
+            [processed] => 18
+            [created] => 23
+            [failed] => 0
+        )
+
+)
+Array
+(
+    [products_migration_complete] => 1
+)

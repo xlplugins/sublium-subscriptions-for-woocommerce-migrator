@@ -199,6 +199,30 @@ class Products_Processor {
 			return false;
 		}
 
+		// Check if product is variable type.
+		$is_variable = $product->is_type( 'variable' ) || $product->is_type( 'variable-subscription' );
+
+		// For variable products, process each variation separately.
+		if ( $is_variable ) {
+			return $this->migrate_variable_product( $product_id );
+		}
+
+		// For simple products, process normally.
+		return $this->migrate_simple_product( $product_id );
+	}
+
+	/**
+	 * Migrate a simple product (non-variable).
+	 *
+	 * @param int $product_id Product ID.
+	 * @return int|false Number of plans created or false.
+	 */
+	private function migrate_simple_product( $product_id ) {
+		$product = wc_get_product( $product_id );
+		if ( ! $product ) {
+			return false;
+		}
+
 		// Check if product is WCS_ATT product.
 		$is_wcsatt = $this->is_wcsatt_product( $product_id );
 
@@ -240,7 +264,7 @@ class Products_Processor {
 				continue; // Continue with next scheme.
 			}
 
-			// Create plan relation for this plan.
+			// Create plan relation for this plan (variation_id = 0 for simple products).
 			$this->create_plan_relation( $plan_id, $product_id, 0, $subscription_settings, $plan_type );
 
 			$created_plan_ids[] = $plan_id;
@@ -251,15 +275,195 @@ class Products_Processor {
 		}
 
 		$plans_count = count( $created_plan_ids );
-		// Return number of plans created (or first plan ID if only one plan).
-		// This allows the caller to track how many plans were actually created.
 		return $plans_count > 0 ? $plans_count : false;
+	}
+
+	/**
+	 * Migrate a variable product and its variations.
+	 *
+	 * @param int $product_id Variable product ID.
+	 * @return int|false Number of plans created or false.
+	 */
+	private function migrate_variable_product( $product_id ) {
+		$product = wc_get_product( $product_id );
+		if ( ! $product || ! ( $product->is_type( 'variable' ) || $product->is_type( 'variable-subscription' ) ) ) {
+			return false;
+		}
+
+		// Get all variations.
+		$variation_ids = $product->get_children();
+		if ( empty( $variation_ids ) ) {
+			return false;
+		}
+
+		// Determine plan type based on virtual status (use parent product).
+		$plan_type = $this->determine_plan_type( $product );
+
+		// Create plan group (one group per variable product).
+		$plan_group_id = $this->create_plan_group( $product, $plan_type );
+		if ( ! $plan_group_id ) {
+			return false;
+		}
+
+		// Step 1: Collect all unique schemes from the variable product.
+		// Check if parent product is WCS_ATT product.
+		$is_wcsatt = $this->is_wcsatt_product( $product_id );
+		$all_unique_schemes = array();
+
+		if ( $is_wcsatt ) {
+			// Get schemes from parent product.
+			$parent_schemes = $this->extract_wcsatt_settings( $product_id );
+			if ( $parent_schemes && is_array( $parent_schemes ) ) {
+				$all_unique_schemes = $parent_schemes;
+			}
+		} else {
+			// Get native subscription settings from parent.
+			$parent_settings = $this->extract_native_subscription_settings( $product_id );
+			if ( $parent_settings ) {
+				$all_unique_schemes = array( $parent_settings );
+			}
+		}
+
+		// Step 2: Also check variations for additional unique schemes (if they have different schemes).
+		// But we'll use parent schemes as primary, and only use variation-specific if parent has none.
+		if ( empty( $all_unique_schemes ) ) {
+			foreach ( $variation_ids as $variation_id ) {
+				$variation = wc_get_product( $variation_id );
+				if ( ! $variation ) {
+					continue;
+				}
+
+				$is_variation_wcsatt = $this->is_wcsatt_product( $variation_id );
+				if ( $is_variation_wcsatt ) {
+					$variation_schemes = $this->extract_wcsatt_settings( $variation_id );
+					if ( $variation_schemes && is_array( $variation_schemes ) ) {
+						// Merge unique schemes.
+						foreach ( $variation_schemes as $scheme ) {
+							$scheme_key = $this->get_scheme_key( $scheme );
+							if ( ! isset( $all_unique_schemes[ $scheme_key ] ) ) {
+								$all_unique_schemes[ $scheme_key ] = $scheme;
+							}
+						}
+					}
+				} else {
+					$variation_settings = $this->extract_native_subscription_settings( $variation_id );
+					if ( $variation_settings ) {
+						$scheme_key = $this->get_scheme_key( $variation_settings );
+						if ( ! isset( $all_unique_schemes[ $scheme_key ] ) ) {
+							$all_unique_schemes[ $scheme_key ] = $variation_settings;
+						}
+					}
+				}
+			}
+		}
+
+		// Convert associative array to indexed array.
+		$all_unique_schemes = array_values( $all_unique_schemes );
+
+		if ( empty( $all_unique_schemes ) ) {
+			return false;
+		}
+
+		// Step 3: Create one plan per unique scheme.
+		$created_plan_ids = array();
+		foreach ( $all_unique_schemes as $scheme_index => $subscription_settings ) {
+			// Check if plan already exists for this scheme (check at product level, vid = 0).
+			$existing_plan_id = $this->check_plan_exists( $product_id, 0, $subscription_settings );
+			if ( $existing_plan_id ) {
+				$created_plan_ids[] = $existing_plan_id;
+				continue;
+			}
+
+			// Create plan for this scheme (use parent product for plan details).
+			$plan_id = $this->create_plan( $plan_group_id, $product, $subscription_settings, $plan_type );
+			if ( ! $plan_id ) {
+				continue; // Continue with next scheme.
+			}
+
+			$created_plan_ids[] = $plan_id;
+		}
+
+		if ( empty( $created_plan_ids ) ) {
+			return false;
+		}
+
+		// Step 4: Create plan relations for each variation for each plan.
+		foreach ( $variation_ids as $variation_id ) {
+			$variation = wc_get_product( $variation_id );
+			if ( ! $variation ) {
+				continue;
+			}
+
+			// For each created plan, create a relation for this variation.
+			foreach ( $created_plan_ids as $plan_id ) {
+				// Get the settings for this plan (we need to match which scheme this plan represents).
+				// Since we created plans in order, we can use the scheme index.
+				$plan_index = array_search( $plan_id, $created_plan_ids, true );
+				if ( false === $plan_index || ! isset( $all_unique_schemes[ $plan_index ] ) ) {
+					continue;
+				}
+
+				$subscription_settings = $all_unique_schemes[ $plan_index ];
+
+				// Check if plan relation already exists for this plan + variation combination.
+				if ( $this->plan_relation_exists( $plan_id, $product_id, $variation_id ) ) {
+					continue; // Relation already exists.
+				}
+
+				// Create plan relation for this variation.
+				$this->create_plan_relation( $plan_id, $product_id, $variation_id, $subscription_settings, $plan_type );
+			}
+		}
+
+		$plans_count = count( $created_plan_ids );
+		return $plans_count > 0 ? $plans_count : false;
+	}
+
+	/**
+	 * Generate a unique key for a scheme based on its billing settings.
+	 *
+	 * @param array $settings Subscription settings.
+	 * @return string Scheme key.
+	 */
+	private function get_scheme_key( $settings ) {
+		$interval = $this->convert_period_to_interval( $settings['period'] ?? 'month' );
+		$frequency = absint( $settings['period_interval'] ?? 1 );
+		$length = absint( $settings['length'] ?? 0 );
+		$trial_days = $this->convert_trial_to_days( $settings['trial_length'] ?? 0, $settings['trial_period'] ?? 'day' );
+
+		return sprintf( '%d_%d_%d_%d', $frequency, $interval, $length, $trial_days );
+	}
+
+	/**
+	 * Check if a plan relation already exists.
+	 *
+	 * @param int $plan_id Plan ID.
+	 * @param int $product_id Product ID.
+	 * @param int $variation_id Variation ID.
+	 * @return bool True if relation exists.
+	 */
+	private function plan_relation_exists( $plan_id, $product_id, $variation_id ) {
+		if ( ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) ) {
+			return false;
+		}
+
+		$plan_relations = new \Sublium_WCS\Includes\database\PlanRelations();
+		$relations = $plan_relations->read(
+			array(
+				'plan_id' => absint( $plan_id ),
+				'oid'     => absint( $product_id ),
+				'vid'     => absint( $variation_id ),
+				'type'    => 1, // Specific product.
+			)
+		);
+
+		return ! empty( $relations ) && is_array( $relations );
 	}
 
 	/**
 	 * Check if product is WCS_ATT product.
 	 *
-	 * @param int $product_id Product ID.
+	 * @param int $product_id Product ID (can be variation ID).
 	 * @return bool
 	 */
 	private function is_wcsatt_product( $product_id ) {
@@ -268,14 +472,33 @@ class Products_Processor {
 			return false;
 		}
 
+		// Check if product has WCS_ATT schemes meta.
 		$schemes = $product->get_meta( '_wcsatt_schemes', true );
-		return ! empty( $schemes ) && is_array( $schemes ) && ! empty( $schemes );
+		if ( ! empty( $schemes ) && is_array( $schemes ) && ! empty( $schemes ) ) {
+			return true;
+		}
+
+		// For variations, also check parent product.
+		if ( $product->is_type( 'variation' ) ) {
+			$parent_id = $product->get_parent_id();
+			if ( $parent_id ) {
+				$parent_product = wc_get_product( $parent_id );
+				if ( $parent_product ) {
+					$parent_schemes = $parent_product->get_meta( '_wcsatt_schemes', true );
+					if ( ! empty( $parent_schemes ) && is_array( $parent_schemes ) && ! empty( $parent_schemes ) ) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
 	 * Extract WCS_ATT subscription settings for all schemes.
 	 *
-	 * @param int $product_id Product ID.
+	 * @param int $product_id Product ID (can be variation ID).
 	 * @return array|false Array of subscription settings (one per scheme) or false.
 	 */
 	private function extract_wcsatt_settings( $product_id ) {
@@ -284,7 +507,20 @@ class Products_Processor {
 			return false;
 		}
 
+		// Check if product has WCS_ATT schemes meta.
 		$schemes = $product->get_meta( '_wcsatt_schemes', true );
+
+		// For variations, if no schemes found, check parent product.
+		if ( empty( $schemes ) && $product->is_type( 'variation' ) ) {
+			$parent_id = $product->get_parent_id();
+			if ( $parent_id ) {
+				$parent_product = wc_get_product( $parent_id );
+				if ( $parent_product ) {
+					$schemes = $parent_product->get_meta( '_wcsatt_schemes', true );
+				}
+			}
+		}
+
 		if ( empty( $schemes ) ) {
 			return false;
 		}
@@ -435,7 +671,7 @@ class Products_Processor {
 	/**
 	 * Extract native subscription settings.
 	 *
-	 * @param int $product_id Product ID.
+	 * @param int $product_id Product ID (can be variation ID).
 	 * @return array|false Subscription settings or false.
 	 */
 	private function extract_native_subscription_settings( $product_id ) {
@@ -445,11 +681,27 @@ class Products_Processor {
 		}
 
 		$product_type = $product->get_type();
-		if ( ! in_array( $product_type, array( 'subscription', 'variable-subscription' ), true ) ) {
+
+		// Check if it's a subscription product or variation.
+		$is_subscription = in_array( $product_type, array( 'subscription', 'variable-subscription', 'subscription_variation' ), true );
+
+		// For variations, also check parent product type.
+		if ( ! $is_subscription && $product->is_type( 'variation' ) ) {
+			$parent_id = $product->get_parent_id();
+			if ( $parent_id ) {
+				$parent_product = wc_get_product( $parent_id );
+				if ( $parent_product && in_array( $parent_product->get_type(), array( 'variable-subscription' ), true ) ) {
+					$is_subscription = true;
+				}
+			}
+		}
+
+		if ( ! $is_subscription ) {
 			return false;
 		}
 
-		return array(
+		// Extract settings from product/variation.
+		$settings = array(
 			'price'           => (float) $product->get_meta( '_subscription_price', true ),
 			'period'          => $product->get_meta( '_subscription_period', true ),
 			'period_interval' => absint( $product->get_meta( '_subscription_period_interval', true ) ),
@@ -458,6 +710,39 @@ class Products_Processor {
 			'trial_length'    => absint( $product->get_meta( '_subscription_trial_length', true ) ),
 			'trial_period'    => $product->get_meta( '_subscription_trial_period', true ),
 		);
+
+		// For variations, if settings are empty, inherit from parent.
+		if ( $product->is_type( 'variation' ) && empty( $settings['period'] ) ) {
+			$parent_id = $product->get_parent_id();
+			if ( $parent_id ) {
+				$parent_product = wc_get_product( $parent_id );
+				if ( $parent_product ) {
+					$parent_settings = array(
+						'price'           => (float) $parent_product->get_meta( '_subscription_price', true ),
+						'period'          => $parent_product->get_meta( '_subscription_period', true ),
+						'period_interval' => absint( $parent_product->get_meta( '_subscription_period_interval', true ) ),
+						'length'          => absint( $parent_product->get_meta( '_subscription_length', true ) ),
+						'sign_up_fee'     => (float) $parent_product->get_meta( '_subscription_sign_up_fee', true ),
+						'trial_length'    => absint( $parent_product->get_meta( '_subscription_trial_length', true ) ),
+						'trial_period'    => $parent_product->get_meta( '_subscription_trial_period', true ),
+					);
+
+					// Merge parent settings, but keep variation-specific values if they exist.
+					foreach ( $parent_settings as $key => $value ) {
+						if ( empty( $settings[ $key ] ) && ! empty( $value ) ) {
+							$settings[ $key ] = $value;
+						}
+					}
+				}
+			}
+		}
+
+		// Return false if no period found (required field).
+		if ( empty( $settings['period'] ) ) {
+			return false;
+		}
+
+		return $settings;
 	}
 
 	/**
