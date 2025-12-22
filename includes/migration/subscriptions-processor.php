@@ -271,14 +271,14 @@ class Subscriptions_Processor {
 			return false;
 		}
 
-		// Find matching Sublium plan.
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_finding_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		// Create or get plan from subscription data.
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_creating_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		$plan_id = $this->find_matching_plan( $wcs_subscription );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_find_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		$plan_id = $this->create_plan_from_subscription( $wcs_subscription, $parent_order );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! $plan_id ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_no_matching_plan' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_plan_creation_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -323,9 +323,6 @@ class Subscriptions_Processor {
 
 		// Get payment gateway.
 		$gateway = $wcs_subscription->get_payment_method();
-
-		// Get plan type from plan.
-		$plan_type = $this->get_plan_type_from_plan( $plan_id );
 
 		// Build search string.
 		$search_str = $this->build_search_string( $wcs_subscription );
@@ -394,10 +391,189 @@ class Subscriptions_Processor {
 	}
 
 	/**
-	 * Find matching Sublium plan for WCS subscription.
+	 * Create plan from WCS subscription data.
+	 *
+	 * @param \WC_Subscription $wcs_subscription WooCommerce Subscription object.
+	 * @param \WC_Order        $parent_order Parent order object.
+	 * @return int|false Plan ID or false.
+	 */
+	private function create_plan_from_subscription( $wcs_subscription, $parent_order ) {
+		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		if ( ! class_exists( '\Sublium_WCS\Includes\database\Plan' ) || ! class_exists( '\Sublium_WCS\Includes\database\GroupPlans' ) || ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_classes_not_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		}
+
+		// Get product IDs from subscription items.
+		$product_ids   = array();
+		$variation_ids = array();
+		foreach ( $wcs_subscription->get_items() as $item ) {
+			$product_id   = $item->get_product_id();
+			$variation_id = $item->get_variation_id();
+			if ( $product_id ) {
+				$product_ids[] = absint( $product_id );
+			}
+			if ( $variation_id ) {
+				$variation_ids[] = absint( $variation_id );
+			}
+		}
+
+		if ( empty( $product_ids ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		}
+
+		// Get billing information from subscription.
+		$billing_period   = $wcs_subscription->get_billing_period();
+		$billing_interval = absint( $wcs_subscription->get_billing_interval() );
+		$billing_length   = absint( $wcs_subscription->get_length() );
+		$trial_length     = absint( $wcs_subscription->get_trial_length() );
+		$trial_period     = $wcs_subscription->get_trial_period();
+		$signup_fee       = (float) $wcs_subscription->get_sign_up_fee();
+
+		// Convert to Sublium format.
+		$interval   = $this->convert_period_to_interval( $billing_period );
+		$frequency  = $billing_interval;
+		$trial_days = $this->convert_trial_to_days( $trial_length, $trial_period );
+
+		// Determine plan type based on product (virtual = Recurring, physical = Subscribe & Save).
+		$plan_type = 2; // Default to Recurring.
+		$first_product = wc_get_product( $product_ids[0] );
+		if ( $first_product && ! $first_product->is_virtual() ) {
+			$plan_type = 1; // Subscribe & Save.
+		}
+
+		// Generate plan title from billing period.
+		$plan_title = $this->generate_plan_title( $billing_period, $billing_interval );
+
+		// Create or get plan group.
+		$plan_group_id = $this->create_or_get_plan_group( $plan_type, $product_ids[0] );
+		if ( ! $plan_group_id ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_group_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		}
+
+		// Prepare signup fee data.
+		$signup_fee_data = array(
+			'signup_fee_type' => 'fixed',
+			'signup_amount'   => $signup_fee,
+		);
+
+		// Prepare offer data (default pricing).
+		$offer_data = array(
+			'price_type'    => 'default',
+			'discount_type' => 'percentage',
+			'discount_value' => '0',
+		);
+
+		// Prepare plan data JSON.
+		$plan_data_json = array(
+			'subscription_ends'              => $billing_length > 0 ? 'after_payments' : 'never',
+			'subscription_ends_payment_count' => $billing_length,
+			'recommended_text'               => '',
+			'additional_description'         => __( 'Enjoy automatic renewals on your schedule. No commitment—modify or cancel anytime.', 'wcs-sublium-migrator' ),
+			'display_summary'                => $this->generate_display_summary( $signup_fee, $trial_days ),
+		);
+
+		// Create plan.
+		$plan_db = new \Sublium_WCS\Includes\database\Plan();
+		$plan_data = array(
+			'plan_group_id'     => absint( $plan_group_id ),
+			'title'             => $plan_title,
+			'type'              => $plan_type,
+			'billing_frequency' => $frequency,
+			'billing_interval'  => $interval,
+			'billing_length'    => $billing_length,
+			'signup_fee'        => wp_json_encode( $signup_fee_data ),
+			'offer'             => wp_json_encode( $offer_data ),
+			'free_trial'        => $trial_days,
+			'data'              => wp_json_encode( $plan_data_json ),
+			'status'            => 1, // Active.
+			'created_at'        => current_time( 'mysql' ),
+			'created_at_utc'    => gmdate( 'Y-m-d H:i:s' ),
+			'updated_at'        => current_time( 'mysql' ),
+			'updated_at_utc'    => gmdate( 'Y-m-d H:i:s' ),
+			'created_by'        => get_current_user_id() ? get_current_user_id() : 1,
+		);
+
+		$plan_id = $plan_db->create( $plan_data );
+		if ( ! $plan_id ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		}
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_success' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'plan_group_id' => $plan_group_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		// Create plan relations for products/variations.
+		$plan_relations_db = new \Sublium_WCS\Includes\database\PlanRelations();
+		$relation_data     = array();
+
+		// Get product prices for relation data.
+		foreach ( $wcs_subscription->get_items() as $item ) {
+			$product = $item->get_product();
+			if ( ! $product ) {
+				continue;
+			}
+
+			$product_id   = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id();
+			$variation_id = $item->get_variation_id();
+
+			$regular_price = (float) $product->get_regular_price();
+			$sale_price    = (float) $product->get_sale_price();
+			if ( empty( $sale_price ) ) {
+				$sale_price = $regular_price;
+			}
+
+			$relation_data_field = wp_json_encode(
+				array(
+					'regular_price' => (string) $regular_price,
+					'sale_price'    => (string) $sale_price,
+				)
+			);
+
+			// Create plan relation.
+			$relation_data = array(
+				'plan_id'            => absint( $plan_id ),
+				'oid'                => absint( $product_id ),
+				'vid'                => $variation_id ? absint( $variation_id ) : 0,
+				'type'               => 1, // Specific product.
+				'status'             => 1, // Active.
+				'relation_data_field' => $relation_data_field,
+			);
+
+			$relation_id = $plan_relations_db->create( $relation_data );
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_relation' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'product_id' => $product_id, 'variation_id' => $variation_id, 'relation_id' => $relation_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		}
+
+		// Update plan group data with plan order.
+		$group_plans_db = new \Sublium_WCS\Includes\database\GroupPlans();
+		$group_data      = $group_plans_db->read( array( 'id' => $plan_group_id ) );
+		if ( ! empty( $group_data ) && is_array( $group_data ) && isset( $group_data[0] ) ) {
+			$existing_data = $group_data[0]['data'] ?? '';
+			$existing_data_array = ! empty( $existing_data ) ? json_decode( $existing_data, true ) : array();
+			if ( ! is_array( $existing_data_array ) ) {
+				$existing_data_array = array();
+			}
+
+			$plan_order = isset( $existing_data_array['plan_order'] ) && is_array( $existing_data_array['plan_order'] ) ? $existing_data_array['plan_order'] : array();
+			if ( ! in_array( (string) $plan_id, $plan_order, true ) ) {
+				$plan_order[] = (string) $plan_id;
+				$existing_data_array['plan_order'] = $plan_order;
+				$group_plans_db->update_single( $plan_group_id, array( 'data' => wp_json_encode( $existing_data_array ) ) );
+			}
+		}
+
+		return absint( $plan_id );
+	}
+
+	/**
+	 * Find matching Sublium plan for WCS subscription (deprecated - kept for reference).
 	 *
 	 * @param \WC_Subscription $wcs_subscription WooCommerce Subscription object.
 	 * @return int|false Plan ID or false.
+	 * @deprecated Use create_plan_from_subscription() instead.
 	 */
 	private function find_matching_plan( $wcs_subscription ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
@@ -731,6 +907,120 @@ class Subscriptions_Processor {
 				return absint( $trial_length * 365 ); // Approximate.
 			default:
 				return 0;
+		}
+	}
+
+	/**
+	 * Create or get plan group for subscription.
+	 *
+	 * @param int $plan_type Plan type (1=Subscribe & Save, 2=Recurring, 3=Installment).
+	 * @param int $product_id Product ID.
+	 * @return int|false Plan group ID or false.
+	 */
+	private function create_or_get_plan_group( $plan_type, $product_id ) {
+		if ( ! class_exists( '\Sublium_WCS\Includes\database\GroupPlans' ) ) {
+			return false;
+		}
+
+		$product = wc_get_product( $product_id );
+		if ( ! $product ) {
+			return false;
+		}
+
+		// Generate group title from product name.
+		$group_title = sprintf( '%s - %s', $product->get_name(), __( 'Subscription Plans', 'wcs-sublium-migrator' ) );
+
+		// Try to find existing plan group for this product.
+		$group_plans_db = new \Sublium_WCS\Includes\database\GroupPlans();
+		$existing_groups = $group_plans_db->read(
+			array(
+				'type' => absint( $plan_type ),
+			)
+		);
+
+		// Check if we can reuse an existing group (simple approach - use first matching type).
+		if ( ! empty( $existing_groups ) && is_array( $existing_groups ) ) {
+			// For now, create a new group for each product to avoid conflicts.
+			// In the future, we could implement smarter matching.
+		}
+
+		// Create new plan group.
+		$group_data = array(
+			'type'         => absint( $plan_type ),
+			'title'        => $group_title,
+			'product_type' => 1, // Specific products.
+			'created_at'   => current_time( 'mysql' ),
+			'created_at_utc' => gmdate( 'Y-m-d H:i:s' ),
+			'updated_at'   => current_time( 'mysql' ),
+			'updated_at_utc' => gmdate( 'Y-m-d H:i:s' ),
+			'created_by'   => get_current_user_id() ? get_current_user_id() : 1,
+			'data'         => wp_json_encode( array( 'plan_order' => array() ) ),
+		);
+
+		$plan_group_id = $group_plans_db->create( $group_data );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_group' => array( 'plan_group_id' => $plan_group_id, 'plan_type' => $plan_type, 'product_id' => $product_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		return $plan_group_id ? absint( $plan_group_id ) : false;
+	}
+
+	/**
+	 * Generate plan title from billing period and interval.
+	 *
+	 * @param string $billing_period Billing period (day, week, month, year).
+	 * @param int    $billing_interval Billing interval.
+	 * @return string Plan title.
+	 */
+	private function generate_plan_title( $billing_period, $billing_interval ) {
+		$period_labels = array(
+			'day'   => __( 'Daily', 'wcs-sublium-migrator' ),
+			'week'  => __( 'Weekly', 'wcs-sublium-migrator' ),
+			'month' => __( 'Monthly', 'wcs-sublium-migrator' ),
+			'year'  => __( 'Yearly', 'wcs-sublium-migrator' ),
+		);
+
+		$period_label = isset( $period_labels[ $billing_period ] ) ? $period_labels[ $billing_period ] : ucfirst( $billing_period );
+
+		if ( 1 === $billing_interval ) {
+			return $period_label;
+		}
+
+		// For intervals > 1, create labels like "Every 3 Months", "Every 2 Weeks", etc.
+		switch ( $billing_period ) {
+			case 'day':
+				/* translators: %d: number of days */
+				return sprintf( _n( 'Every %d Day', 'Every %d Days', $billing_interval, 'wcs-sublium-migrator' ), $billing_interval );
+			case 'week':
+				/* translators: %d: number of weeks */
+				return sprintf( _n( 'Every %d Week', 'Every %d Weeks', $billing_interval, 'wcs-sublium-migrator' ), $billing_interval );
+			case 'month':
+				/* translators: %d: number of months */
+				return sprintf( _n( 'Every %d Month', 'Every %d Months', $billing_interval, 'wcs-sublium-migrator' ), $billing_interval );
+			case 'year':
+				/* translators: %d: number of years */
+				return sprintf( _n( 'Every %d Year', 'Every %d Years', $billing_interval, 'wcs-sublium-migrator' ), $billing_interval );
+			default:
+				return $period_label;
+		}
+	}
+
+	/**
+	 * Generate display summary text for plan.
+	 *
+	 * @param float $signup_fee Signup fee amount.
+	 * @param int   $trial_days Trial days.
+	 * @return string Display summary.
+	 */
+	private function generate_display_summary( $signup_fee, $trial_days ) {
+		if ( $trial_days > 0 && $signup_fee > 0 ) {
+			/* translators: %1$d: trial days, %2$s: signup fee */
+			return sprintf( __( 'Billed {{subscription_price}} after %1$d days free trial and a one-time %2$s signup fee.', 'wcs-sublium-migrator' ), $trial_days, '{{signup_fee}}' );
+		} elseif ( $trial_days > 0 ) {
+			/* translators: %d: trial days */
+			return sprintf( __( 'Billed {{subscription_price}} after %d days free trial.', 'wcs-sublium-migrator' ), $trial_days );
+		} elseif ( $signup_fee > 0 ) {
+			return __( 'Billed {{subscription_price}} with a one-time {{signup_fee}} signup fee.', 'wcs-sublium-migrator' );
+		} else {
+			return __( 'Billed {{subscription_price}}.', 'wcs-sublium-migrator' );
 		}
 	}
 }
