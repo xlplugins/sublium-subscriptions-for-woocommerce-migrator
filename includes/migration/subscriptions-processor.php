@@ -225,6 +225,29 @@ class Subscriptions_Processor {
 			return false;
 		}
 
+		// Update created_at dates after creation (Subscription::save() overrides them during creation).
+		if ( ! empty( $subscription_data['created_at'] ) && ! empty( $subscription_data['created_at_utc'] ) ) {
+			// Update created_at dates directly via database to avoid save() override.
+			global $wpdb;
+			$table_name = $wpdb->prefix . 'sublium_wcs_subscriptions';
+			$wpdb->update(
+				$table_name,
+				array(
+					'created_at'     => $subscription_data['created_at'],
+					'created_at_utc' => $subscription_data['created_at_utc'],
+				),
+				array( 'id' => $sublium_subscription_id ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+			// Reload subscription to reflect changes.
+			if ( function_exists( 'sublium_get_subscription' ) ) {
+				$sublium_subscription = sublium_get_subscription( $sublium_subscription_id );
+			} else {
+				$sublium_subscription = new \Sublium_WCS\Includes\Controller\Subscriptions\Subscription( $sublium_subscription_id );
+			}
+		}
+
 		// Add subscription items.
 		$this->add_subscription_items( $sublium_subscription, $wcs_subscription );
 
