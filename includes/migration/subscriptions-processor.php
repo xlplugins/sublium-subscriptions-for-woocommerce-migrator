@@ -197,8 +197,12 @@ class Subscriptions_Processor {
 		// Check if subscription already migrated.
 		$existing_sublium_id = $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true );
 		if ( ! empty( $existing_sublium_id ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscription_already_migrated' => array( 'wcs_id' => $subscription_id, 'sublium_id' => $existing_sublium_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-			return absint( $existing_sublium_id );
+			$sublium_subscription = sublium_get_subscription($existing_sublium_id);
+			if($sublium_subscription->exists){
+				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscription_already_migrated' => array( 'wcs_id' => $subscription_id, 'sublium_id' => $existing_sublium_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+				return absint( $existing_sublium_id );
+			}
+
 		}
 
 		// Extract subscription data from WCS subscription.
@@ -285,9 +289,26 @@ class Subscriptions_Processor {
 		$plan_type = isset( $plan_data['type'] ) ? absint( $plan_data['type'] ) : 2; // Default to Recurring.
 
 		// Get dates.
+		$created_date      = $wcs_subscription->get_date_created();
 		$next_payment_date = $wcs_subscription->get_date( 'next_payment' );
 		$end_date          = $wcs_subscription->get_date( 'end' );
 		$trial_end_date    = $wcs_subscription->get_date( 'trial_end' );
+
+		// Convert created date to system/UTC format.
+		if ( $created_date && is_a( $created_date, 'WC_DateTime' ) ) {
+			$created_date_utc    = $created_date->date( 'Y-m-d H:i:s' );
+			$created_date_system = get_date_from_gmt( $created_date_utc, 'Y-m-d H:i:s' );
+		} else {
+			// Fallback to date_created meta if get_date_created() doesn't work.
+			$created_date_string = $wcs_subscription->get_date( 'date_created' );
+			if ( ! empty( $created_date_string ) && '0' !== $created_date_string ) {
+				$created_date_utc    = $created_date_string;
+				$created_date_system = get_date_from_gmt( $created_date_string, 'Y-m-d H:i:s' );
+			} else {
+				$created_date_utc    = gmdate( 'Y-m-d H:i:s' );
+				$created_date_system = current_time( 'mysql' );
+			}
+		}
 
 		// Convert dates to system/UTC format.
 		if ( ! empty( $next_payment_date ) && '0' !== $next_payment_date ) {
@@ -343,7 +364,7 @@ class Subscriptions_Processor {
 		$trial_length_meta   = 0;
 		$trial_period_meta   = '';
 		$signup_fee_meta     = 0.0;
-		
+
 		if ( ! empty( $item_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
 			$first_product = wc_get_product( absint( $item_ids[0] ) );
 			if ( $first_product ) {
@@ -398,6 +419,8 @@ class Subscriptions_Processor {
 			'currency'              => $currency,
 			'totals'                => $totals,
 			'base_totals'           => $base_totals,
+			'created_at'            => $created_date_system,
+			'created_at_utc'        => $created_date_utc,
 			'next_payment_date'     => $next_payment_date_system,
 			'next_payment_date_utc' => $next_payment_date_utc,
 			'last_payment_date'     => $wcs_subscription->get_date( 'last_order_date_created' ) ? get_date_from_gmt( $wcs_subscription->get_date( 'last_order_date_created' ), 'Y-m-d H:i:s' ) : null,
@@ -446,7 +469,7 @@ class Subscriptions_Processor {
 		$trial_length   = 0;
 		$trial_period   = '';
 		$signup_fee     = 0.0;
-		
+
 		if ( ! empty( $product_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
 			$first_product = wc_get_product( $product_ids[0] );
 			if ( $first_product ) {
@@ -598,11 +621,11 @@ class Subscriptions_Processor {
 		// Get billing period and interval.
 		$billing_period   = $wcs_subscription->get_billing_period();
 		$billing_interval = absint( $wcs_subscription->get_billing_interval() );
-		
+
 		// Get trial details from product (subscription doesn't have get_trial_length, get_trial_period methods).
 		$trial_length = 0;
 		$trial_period = '';
-		
+
 		if ( ! empty( $product_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
 			$first_product = wc_get_product( $product_ids[0] );
 			if ( $first_product ) {
@@ -717,6 +740,8 @@ class Subscriptions_Processor {
 			return;
 		}
 
+		$item_ids = array();
+
 		foreach ( $wcs_subscription->get_items() as $wcs_item ) {
 			$product = $wcs_item->get_product();
 			if ( ! $product ) {
@@ -726,9 +751,8 @@ class Subscriptions_Processor {
 			$variation_id = $wcs_item->get_variation_id();
 			$product_id   = $product->is_type( 'variation' ) ? $product->get_parent_id() : $product->get_id();
 
-			// Prepare item data.
-			$item_data = array(
-				'item_type'    => 1, // Product item.
+			// Prepare item_data array (nested structure).
+			$item_data_array = array(
 				'product_id'   => absint( $product_id ),
 				'variation_id' => $variation_id ? absint( $variation_id ) : 0,
 				'quantity'     => absint( $wcs_item->get_quantity() ),
@@ -742,10 +766,34 @@ class Subscriptions_Processor {
 
 			// Use Utility to prepare item data if available.
 			if ( method_exists( '\Sublium_WCS\Includes\Helpers\Utility', 'prepare_subscription_item' ) ) {
-				$item_data = \Sublium_WCS\Includes\Helpers\Utility::prepare_subscription_item( $item_data, $sublium_subscription );
+				$prepared_data = \Sublium_WCS\Includes\Helpers\Utility::prepare_subscription_item( $item_data_array, $sublium_subscription );
+				// Utility may return different structure, merge it back into item_data_array.
+				if ( is_array( $prepared_data ) && isset( $prepared_data['item_data'] ) ) {
+					$item_data_array = array_merge( $item_data_array, $prepared_data['item_data'] );
+				}
 			}
 
-			$sublium_subscription->add_item( $item_data );
+			// Prepare item data in correct format for add_item().
+			$item_data = array(
+				'item_type' => 1, // Product item.
+				'item_data' => $item_data_array,
+			);
+
+			// Add item to subscription.
+			$added = $sublium_subscription->add_item( $item_data );
+			if ( $added ) {
+				// Collect item IDs for update_items().
+				$values = array( (string) $product_id );
+				if ( ! empty( $variation_id ) ) {
+					$values[] = (string) $variation_id;
+				}
+				$item_ids = array_merge( $item_ids, array_filter( $values ) );
+			}
+		}
+
+		// Update subscription items field with collected item IDs.
+		if ( ! empty( $item_ids ) ) {
+			$sublium_subscription->update_items( $item_ids );
 		}
 	}
 
