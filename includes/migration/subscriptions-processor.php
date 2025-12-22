@@ -271,19 +271,18 @@ class Subscriptions_Processor {
 			return false;
 		}
 
-		// Create or get plan from subscription data.
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_creating_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		// Create plan_data from subscription data.
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_creating_plan_data_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		$plan_result = $this->create_plan_from_subscription( $wcs_subscription, $parent_order );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_result' => array( 'subscription_id' => $subscription_id, 'plan_result' => $plan_result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		$plan_data = $this->create_plan_data_from_subscription( $wcs_subscription, $parent_order );
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_data_result' => array( 'subscription_id' => $subscription_id, 'has_plan_data' => ! empty( $plan_data ), 'plan_data_keys' => ! empty( $plan_data ) && is_array( $plan_data ) ? array_keys( $plan_data ) : array() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		if ( empty( $plan_result ) || ! is_array( $plan_result ) || ! isset( $plan_result['plan_id'] ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_plan_creation_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+		if ( empty( $plan_data ) || ! is_array( $plan_data ) ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_plan_data_creation_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
-		$plan_id   = absint( $plan_result['plan_id'] );
-		$plan_type = isset( $plan_result['plan_type'] ) ? absint( $plan_result['plan_type'] ) : 1;
+		$plan_type = isset( $plan_data['type'] ) ? absint( $plan_data['type'] ) : 2; // Default to Recurring.
 
 		// Get dates.
 		$next_payment_date = $wcs_subscription->get_date( 'next_payment' );
