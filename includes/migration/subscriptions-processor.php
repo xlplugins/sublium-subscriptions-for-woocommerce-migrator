@@ -433,7 +433,16 @@ class Subscriptions_Processor {
 		// Get billing information from subscription.
 		$billing_period   = $wcs_subscription->get_billing_period();
 		$billing_interval = absint( $wcs_subscription->get_billing_interval() );
-		$billing_length   = absint( $wcs_subscription->get_length() );
+		
+		// Get length from product (subscription doesn't have get_length method).
+		$billing_length = 0;
+		if ( ! empty( $product_ids ) && class_exists( 'WC_Subscriptions_Product' ) ) {
+			$first_product = wc_get_product( $product_ids[0] );
+			if ( $first_product ) {
+				$billing_length = absint( \WC_Subscriptions_Product::get_length( $first_product ) );
+			}
+		}
+		
 		$trial_length     = absint( $wcs_subscription->get_trial_length() );
 		$trial_period     = $wcs_subscription->get_trial_period();
 		$signup_fee       = (float) $wcs_subscription->get_sign_up_fee();
