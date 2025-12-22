@@ -255,6 +255,26 @@ class Subscriptions_Processor {
 		$wcs_subscription->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
 		$wcs_subscription->save();
 
+		// Link parent order to Sublium subscription.
+		$parent_order = $wcs_subscription->get_parent();
+		if ( $parent_order ) {
+			$parent_order->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
+			$parent_order->save();
+		}
+
+		// Link renewal orders to Sublium subscription.
+		$renewal_order_ids = $wcs_subscription->get_related_orders( 'ids', 'renewal' );
+		if ( ! empty( $renewal_order_ids ) ) {
+			foreach ( $renewal_order_ids as $renewal_order_id ) {
+				$renewal_order = wc_get_order( $renewal_order_id );
+				if ( $renewal_order ) {
+					$renewal_order->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
+					$renewal_order->update_meta_data( '_sublium_wcs_subscription_renewal', 'yes' );
+					$renewal_order->save();
+				}
+			}
+		}
+
 		// Create activity log.
 		if ( class_exists( '\Sublium_WCS\Includes\Helpers\Subscription' ) ) {
 			\Sublium_WCS\Includes\Helpers\Subscription::create_activity(
