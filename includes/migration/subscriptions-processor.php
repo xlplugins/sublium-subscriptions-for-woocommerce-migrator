@@ -404,7 +404,8 @@ class Subscriptions_Processor {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
 		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		// Get product IDs from subscription items.
+		try {
+			// Get product IDs from subscription items.
 		$product_ids = array();
 		foreach ( $wcs_subscription->get_items() as $item ) {
 			$product_id = $item->get_product_id();
@@ -517,9 +518,16 @@ class Subscriptions_Processor {
 			'subscription_id'    => $subscription_id, // Store original subscription ID for reference.
 		);
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_success' => array( 'subscription_id' => $subscription_id, 'plan_data' => $plan_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_success' => array( 'subscription_id' => $subscription_id, 'plan_data' => $plan_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
-		return $plan_data;
+			return $plan_data;
+		} catch ( \Exception $e ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_exception' => array( 'subscription_id' => $subscription_id, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		} catch ( \Error $e ) {
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_fatal_error' => array( 'subscription_id' => $subscription_id, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			return false;
+		}
 	}
 
 	/**
