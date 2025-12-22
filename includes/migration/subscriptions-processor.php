@@ -406,29 +406,19 @@ class Subscriptions_Processor {
 	 */
 	private function create_plan_data_from_subscription( $wcs_subscription, $parent_order ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
-		if ( ! class_exists( '\Sublium_WCS\Includes\database\Plan' ) || ! class_exists( '\Sublium_WCS\Includes\database\GroupPlans' ) || ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_classes_not_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-			return false;
-		}
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Get product IDs from subscription items.
-		$product_ids   = array();
-		$variation_ids = array();
+		$product_ids = array();
 		foreach ( $wcs_subscription->get_items() as $item ) {
-			$product_id   = $item->get_product_id();
-			$variation_id = $item->get_variation_id();
+			$product_id = $item->get_product_id();
 			if ( $product_id ) {
 				$product_ids[] = absint( $product_id );
-			}
-			if ( $variation_id ) {
-				$variation_ids[] = absint( $variation_id );
 			}
 		}
 
 		if ( empty( $product_ids ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -455,13 +445,6 @@ class Subscriptions_Processor {
 		// Generate plan title from billing period.
 		$plan_title = $this->generate_plan_title( $billing_period, $billing_interval );
 
-		// Create or get plan group.
-		$plan_group_id = $this->create_or_get_plan_group( $plan_type, $product_ids[0] );
-		if ( ! $plan_group_id ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_group_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-			return false;
-		}
-
 		// Prepare signup fee data.
 		$signup_fee_data = array(
 			'signup_fee_type' => 'fixed',
@@ -484,40 +467,8 @@ class Subscriptions_Processor {
 			'display_summary'                => $this->generate_display_summary( $signup_fee, $trial_days ),
 		);
 
-		// Create plan.
-		$plan_db = new \Sublium_WCS\Includes\database\Plan();
-		$plan_data = array(
-			'plan_group_id'     => absint( $plan_group_id ),
-			'title'             => $plan_title,
-			'type'              => $plan_type,
-			'billing_frequency' => $frequency,
-			'billing_interval'  => $interval,
-			'billing_length'    => $billing_length,
-			'signup_fee'        => wp_json_encode( $signup_fee_data ),
-			'offer'             => wp_json_encode( $offer_data ),
-			'free_trial'        => $trial_days,
-			'data'              => wp_json_encode( $plan_data_json ),
-			'status'            => 1, // Active.
-			'created_at'        => current_time( 'mysql' ),
-			'created_at_utc'    => gmdate( 'Y-m-d H:i:s' ),
-			'updated_at'        => current_time( 'mysql' ),
-			'updated_at_utc'    => gmdate( 'Y-m-d H:i:s' ),
-			'created_by'        => get_current_user_id() ? get_current_user_id() : 1,
-		);
-
-		$plan_id = $plan_db->create( $plan_data );
-		if ( ! $plan_id ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-			return false;
-		}
-
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_success' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'plan_group_id' => $plan_group_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
-		// Create plan relations for products/variations.
-		$plan_relations_db = new \Sublium_WCS\Includes\database\PlanRelations();
-		$relation_data     = array();
-
 		// Get product prices for relation data.
+		$relation_data = array();
 		foreach ( $wcs_subscription->get_items() as $item ) {
 			$product = $item->get_product();
 			if ( ! $product ) {
@@ -533,49 +484,34 @@ class Subscriptions_Processor {
 				$sale_price = $regular_price;
 			}
 
-			$relation_data_field = wp_json_encode(
-				array(
-					'regular_price' => (string) $regular_price,
-					'sale_price'    => (string) $sale_price,
-				)
+			$relation_data[] = array(
+				'regular_price' => (string) $regular_price,
+				'sale_price'    => (string) $sale_price,
 			);
-
-			// Create plan relation.
-			$relation_data = array(
-				'plan_id'            => absint( $plan_id ),
-				'oid'                => absint( $product_id ),
-				'vid'                => $variation_id ? absint( $variation_id ) : 0,
-				'type'               => 1, // Specific product.
-				'status'             => 1, // Active.
-				'relation_data_field' => $relation_data_field,
-			);
-
-			$relation_id = $plan_relations_db->create( $relation_data );
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_relation' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'product_id' => $product_id, 'variation_id' => $variation_id, 'relation_id' => $relation_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 
-		// Update plan group data with plan order.
-		$group_plans_db = new \Sublium_WCS\Includes\database\GroupPlans();
-		$group_data      = $group_plans_db->read( array( 'id' => $plan_group_id ) );
-		if ( ! empty( $group_data ) && is_array( $group_data ) && isset( $group_data[0] ) ) {
-			$existing_data = $group_data[0]['data'] ?? '';
-			$existing_data_array = ! empty( $existing_data ) ? json_decode( $existing_data, true ) : array();
-			if ( ! is_array( $existing_data_array ) ) {
-				$existing_data_array = array();
-			}
-
-			$plan_order = isset( $existing_data_array['plan_order'] ) && is_array( $existing_data_array['plan_order'] ) ? $existing_data_array['plan_order'] : array();
-			if ( ! in_array( (string) $plan_id, $plan_order, true ) ) {
-				$plan_order[] = (string) $plan_id;
-				$existing_data_array['plan_order'] = $plan_order;
-				$group_plans_db->update_single( $plan_group_id, array( 'data' => wp_json_encode( $existing_data_array ) ) );
-			}
-		}
-
-		return array(
-			'plan_id'   => absint( $plan_id ),
-			'plan_type' => absint( $plan_type ),
+		// Build plan_data structure matching Sublium's plan format.
+		$plan_data = array(
+			'id'                => 0, // Set to 0 for plan_data.
+			'plan_group_id'     => 0, // Not needed for plan_data.
+			'title'             => $plan_title,
+			'type'              => $plan_type,
+			'billing_frequency' => $frequency,
+			'billing_interval'  => $interval,
+			'billing_length'    => $billing_length,
+			'signup_fee'        => wp_json_encode( $signup_fee_data ),
+			'offer'             => wp_json_encode( $offer_data ),
+			'free_trial'        => $trial_days,
+			'data'              => wp_json_encode( $plan_data_json ),
+			'status'            => 1, // Active.
+			'object_type'       => '1', // Specific product.
+			'relation_data'     => ! empty( $relation_data ) ? $relation_data[0] : array(), // Use first product's relation data.
+			'subscription_id'    => $subscription_id, // Store original subscription ID for reference.
 		);
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_success' => array( 'subscription_id' => $subscription_id, 'plan_data' => $plan_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
+		return $plan_data;
 	}
 
 	/**
