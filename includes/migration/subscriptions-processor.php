@@ -851,9 +851,9 @@ class Subscriptions_Processor {
 			// HPOS mode: Query wc_orders_meta table.
 			$renewal_order_ids = $wpdb->get_col(
 				$wpdb->prepare(
-					"SELECT DISTINCT order_id 
-					FROM {$wpdb->prefix}wc_orders_meta 
-					WHERE meta_key = %s 
+					"SELECT DISTINCT order_id
+					FROM {$wpdb->prefix}wc_orders_meta
+					WHERE meta_key = %s
 					AND meta_value = %s",
 					'_subscription_renewal',
 					$wcs_subscription_id
@@ -863,9 +863,9 @@ class Subscriptions_Processor {
 			// CPT mode: Query postmeta table.
 			$renewal_order_ids = $wpdb->get_col(
 				$wpdb->prepare(
-					"SELECT DISTINCT post_id 
-					FROM {$wpdb->postmeta} 
-					WHERE meta_key = %s 
+					"SELECT DISTINCT post_id
+					FROM {$wpdb->postmeta}
+					WHERE meta_key = %s
 					AND meta_value = %s",
 					'_subscription_renewal',
 					$wcs_subscription_id
@@ -899,10 +899,10 @@ class Subscriptions_Processor {
 				// Check if meta already exists.
 				$existing_meta = $wpdb->get_var(
 					$wpdb->prepare(
-						"SELECT meta_id 
-						FROM {$wpdb->prefix}wc_orders_meta 
-						WHERE order_id = %d 
-						AND meta_key = %s 
+						"SELECT meta_id
+						FROM {$wpdb->prefix}wc_orders_meta
+						WHERE order_id = %d
+						AND meta_key = %s
 						LIMIT 1",
 						$order_id,
 						'_sublium_wcs_subscription_id'
@@ -938,10 +938,10 @@ class Subscriptions_Processor {
 				if ( $is_renewal ) {
 					$existing_renewal_meta = $wpdb->get_var(
 						$wpdb->prepare(
-							"SELECT meta_id 
-							FROM {$wpdb->prefix}wc_orders_meta 
-							WHERE order_id = %d 
-							AND meta_key = %s 
+							"SELECT meta_id
+							FROM {$wpdb->prefix}wc_orders_meta
+							WHERE order_id = %d
+							AND meta_key = %s
 							LIMIT 1",
 							$order_id,
 							'_sublium_wcs_subscription_renewal'
