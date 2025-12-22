@@ -413,6 +413,8 @@ class Subscriptions_Processor {
 			}
 		}
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_product_ids' => array( 'subscription_id' => $subscription_id, 'product_ids' => $product_ids, 'count' => count( $product_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		if ( empty( $product_ids ) ) {
 			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
@@ -426,10 +428,14 @@ class Subscriptions_Processor {
 		$trial_period     = $wcs_subscription->get_trial_period();
 		$signup_fee       = (float) $wcs_subscription->get_sign_up_fee();
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'billing_length' => $billing_length, 'trial_length' => $trial_length, 'trial_period' => $trial_period, 'signup_fee' => $signup_fee ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		// Convert to Sublium format.
 		$interval   = $this->convert_period_to_interval( $billing_period );
 		$frequency  = $billing_interval;
 		$trial_days = $this->convert_trial_to_days( $trial_length, $trial_period );
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_converted' => array( 'subscription_id' => $subscription_id, 'interval' => $interval, 'frequency' => $frequency, 'trial_days' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Determine plan type based on product (virtual = Recurring, physical = Subscribe & Save).
 		$plan_type = 2; // Default to Recurring.
@@ -438,8 +444,12 @@ class Subscriptions_Processor {
 			$plan_type = 1; // Subscribe & Save.
 		}
 
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_plan_type' => array( 'subscription_id' => $subscription_id, 'plan_type' => $plan_type, 'product_is_virtual' => $first_product ? $first_product->is_virtual() : 'no_product' ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
+
 		// Generate plan title from billing period.
 		$plan_title = $this->generate_plan_title( $billing_period, $billing_interval );
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_title' => array( 'subscription_id' => $subscription_id, 'plan_title' => $plan_title ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Prepare signup fee data.
 		$signup_fee_data = array(
@@ -485,6 +495,8 @@ class Subscriptions_Processor {
 				'sale_price'    => (string) $sale_price,
 			);
 		}
+
+		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_relation_data' => array( 'subscription_id' => $subscription_id, 'relation_data' => $relation_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Build plan_data structure matching Sublium's plan format.
 		$plan_data = array(
