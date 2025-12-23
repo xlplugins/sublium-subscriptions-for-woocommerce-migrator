@@ -406,6 +406,7 @@ class Subscriptions_Processor {
 			'trial_period'      => $trial_period_meta,
 			'signup_fee'        => $signup_fee_meta,
 			'plan_data'         => $plan_data, // Store plan_data in meta for recurring payments.
+			'wcs_subscription_id' => absint( $wcs_subscription->get_id() ), // Store WCS subscription ID for maintaining relationship.
 		);
 
 		// Add billing and shipping details.
