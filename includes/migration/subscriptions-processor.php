@@ -64,6 +64,28 @@ class Subscriptions_Processor {
 				$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
 				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_migrating' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
+				// Check gateway support before migration.
+				$gateway = $wcs_subscription->get_payment_method();
+				if ( ! empty( $gateway ) && ! $this->is_gateway_supported_by_sublium( $gateway ) ) {
+					$gateway_title = $wcs_subscription->get_payment_method_title();
+					$warning_message = sprintf(
+						/* translators: 1: Subscription ID, 2: Gateway ID, 3: Gateway Title */
+						__( 'Subscription #%1$d uses unsupported gateway "%2$s" (%3$s). This subscription will be migrated but may require manual payment method update.', 'wcs-sublium-migrator' ),
+						$subscription_id,
+						$gateway,
+						! empty( $gateway_title ) ? $gateway_title : $gateway
+					);
+					$state->add_error(
+						$warning_message,
+						array(
+							'subscription_id' => $subscription_id,
+							'gateway'        => $gateway,
+							'gateway_title'  => $gateway_title,
+							'type'           => 'gateway_warning',
+						)
+					);
+				}
+
 				$result = $this->migrate_subscription( $wcs_subscription );
 				if ( $result ) {
 					++$created;
@@ -359,6 +381,7 @@ class Subscriptions_Processor {
 		// Get billing period and interval.
 		$billing_period   = $wcs_subscription->get_billing_period();
 		$billing_interval = $wcs_subscription->get_billing_interval();
+
 
 		// Get totals.
 		$totals      = (float) $wcs_subscription->get_total();
@@ -1028,6 +1051,43 @@ class Subscriptions_Processor {
 
 		$plan = $plan_data[0];
 		return isset( $plan['type'] ) ? absint( $plan['type'] ) : 1;
+	}
+
+	/**
+	 * Check if gateway is supported by Sublium.
+	 *
+	 * @param string $gateway_id Gateway ID.
+	 * @return bool True if supported, false otherwise.
+	 */
+	private function is_gateway_supported_by_sublium( $gateway_id ) {
+		if ( empty( $gateway_id ) ) {
+			return true; // Empty gateway means manual renewal, which is supported.
+		}
+
+		// Manual payment gateways are always supported.
+		$manual_gateways = array( 'bacs', 'cheque', 'cod', 'manual' );
+		if ( in_array( $gateway_id, $manual_gateways, true ) ) {
+			return true;
+		}
+
+		// Get supported gateways from Sublium using static method.
+		if ( class_exists( '\Sublium_WCS\Includes\Abstracts\Payment_Gateway' ) ) {
+			$supported_gateways = \Sublium_WCS\Includes\Abstracts\Payment_Gateway::get_supported_gateways();
+			if ( is_array( $supported_gateways ) && array_key_exists( $gateway_id, $supported_gateways ) ) {
+				return true;
+			}
+		}
+
+		// Check if gateway instance exists (means it's registered and available).
+		if ( class_exists( '\Sublium_WCS\Includes\Main\Gateways' ) ) {
+			$gateways_instance = \Sublium_WCS\Includes\Main\Gateways::get_instance();
+			if ( method_exists( $gateways_instance, 'get_gateway' ) ) {
+				$gateway_instance = $gateways_instance->get_gateway( $gateway_id );
+				return ! empty( $gateway_instance );
+			}
+		}
+
+		return false;
 	}
 
 	/**
