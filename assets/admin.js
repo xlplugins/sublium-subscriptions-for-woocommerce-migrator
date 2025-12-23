@@ -288,8 +288,8 @@
 								${subscriptionsFailed > 0 ? ` (${subscriptionsFailed} failed)` : ''}
 							</div>
 							<div class="wcs-migrator-progress-bar">
-								<div class="wcs-migrator-progress-fill" style="width: ${subscriptionsProgress}%">
-									${Math.round(subscriptionsProgress)}%
+								<div class="wcs-migrator-progress-fill" style="width: ${Math.min(100, subscriptionsProgress)}%">
+									${Math.round(Math.min(100, subscriptionsProgress))}%
 								</div>
 							</div>
 						</div>

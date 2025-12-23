@@ -242,7 +242,10 @@ class Migration_API {
 
 		$subscriptions_progress = 0;
 		if ( isset( $status['subscriptions_migration'] ) && is_array( $status['subscriptions_migration'] ) && isset( $status['subscriptions_migration']['total_subscriptions'] ) && absint( $status['subscriptions_migration']['total_subscriptions'] ) > 0 ) {
-			$subscriptions_progress = ( absint( $status['subscriptions_migration']['processed_subscriptions'] ?? 0 ) / absint( $status['subscriptions_migration']['total_subscriptions'] ) ) * 100;
+			$processed = absint( $status['subscriptions_migration']['processed_subscriptions'] ?? 0 );
+			$total     = absint( $status['subscriptions_migration']['total_subscriptions'] );
+			// Cap progress at 100% if processed exceeds total (can happen if subscriptions are added during migration).
+			$subscriptions_progress = min( 100, ( $processed / $total ) * 100 );
 		}
 
 		$status['progress'] = array(
