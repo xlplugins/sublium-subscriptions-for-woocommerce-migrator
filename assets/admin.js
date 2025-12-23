@@ -319,16 +319,23 @@
 		},
 
 		renderCompleted: function(data) {
+			// Safe property access with defaults.
+			const productsMigration = data.products_migration || {};
+			const subscriptionsMigration = data.subscriptions_migration || {};
+			const productsCreated = productsMigration.created_plans || 0;
+			const subscriptionsCreated = subscriptionsMigration.created_subscriptions || 0;
+			const errors = data.errors || [];
+
 			const html = `
 				<div class="wcs-migrator-feasibility">
 					<h2>Migration Completed</h2>
-					<p>Products migrated: ${data.products_migration.created_plans}</p>
-					<p>Subscriptions migrated: ${data.subscriptions_migration.created_subscriptions}</p>
-					${data.errors && data.errors.length > 0 ? `
+					<p>Products migrated: ${productsCreated}</p>
+					<p>Subscriptions migrated: ${subscriptionsCreated}</p>
+					${errors.length > 0 ? `
 						<div class="wcs-migrator-errors">
-							<h3>Errors (${data.errors.length})</h3>
+							<h3>Errors (${errors.length})</h3>
 							<ul>
-								${data.errors.map(error => `<li>${error.message} (${error.time})</li>`).join('')}
+								${errors.map(error => `<li>${error.message} (${error.time})</li>`).join('')}
 							</ul>
 						</div>
 					` : ''}
