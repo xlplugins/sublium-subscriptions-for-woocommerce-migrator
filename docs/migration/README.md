@@ -27,34 +27,36 @@ Sublium (Target)
 
 ### Key Components
 
-1. **Migration Controller** (`includes/migration/class-wcs-migrator.php`)
+1. **Migration Controller** (`includes/migration/scheduler.php`)
    - Main orchestrator for migration process
-   - Handles batch processing
-   - Manages migration state
+   - Handles scheduled batch processing via WordPress cron
+   - Manages migration state and progress
 
-2. **Data Extractors**
-   - `includes/migration/extractors/class-subscription-extractor.php` - Extract WCS subscriptions
-   - `includes/migration/extractors/class-product-extractor.php` - Extract subscription products (native + WCS_ATT)
-   - `includes/migration/extractors/class-payment-extractor.php` - Extract payment methods
+2. **Discovery** (`includes/migration/discovery.php`)
+   - Analyzes WCS data before migration
+   - Checks gateway compatibility
+   - Provides feasibility assessment
+   - Shows breakdown by payment gateways and product types
 
-3. **Data Transformers**
-   - `includes/migration/transformers/class-subscription-transformer.php` - Transform WCS → Sublium format
-   - `includes/migration/transformers/class-product-transformer.php` - Transform products
-   - `includes/migration/transformers/class-payment-transformer.php` - Transform payment tokens
+3. **Processors**
+   - `includes/migration/products-processor.php` - Migrates products and creates plans
+   - `includes/migration/subscriptions-processor.php` - Migrates subscriptions with plan_data
 
-4. **Data Importers**
-   - `includes/migration/importers/class-subscription-importer.php` - Import subscriptions
-   - `includes/migration/importers/class-plan-importer.php` - Import/create plans
+4. **State Management** (`includes/migration/state.php`)
+   - Tracks migration progress
+   - Stores errors and warnings
+   - Manages migration status
 
-5. **Admin Interface**
-   - `admin/app/pages/migration/` - React admin UI
-   - Migration status dashboard
-   - Progress tracking
-   - Error reporting
+5. **Admin Interface** (`includes/admin/admin.php`)
+   - Admin menu and UI
+   - Migration control buttons
+   - Real-time progress display
+   - Gateway compatibility warnings
 
-6. **Validation & Logging**
-   - `includes/migration/validators/class-migration-validator.php` - Validate migrated data
-   - `includes/migration/loggers/class-migration-logger.php` - Log migration activities
+6. **REST API** (`includes/api/migration-api.php`)
+   - REST endpoints for migration control
+   - Status and discovery endpoints
+   - AJAX handlers for admin UI
 
 ## Migration Sequence
 

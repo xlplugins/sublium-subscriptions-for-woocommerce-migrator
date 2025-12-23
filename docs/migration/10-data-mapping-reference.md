@@ -168,3 +168,88 @@ if ($product->is_virtual()) {
 - `week` → days × 7
 - `month` → days × 30 (approximate)
 - `year` → days × 365 (approximate)
+
+## Subscription Meta Data Mapping
+
+### WCS Subscription ID Storage
+
+**Meta Key:** `wcs_subscription_id`
+
+**Purpose:** Maintains relationship between Sublium and WooCommerce Subscriptions
+
+**Storage:** Stored in `wp_sublium_wcs_subscription_meta` table
+
+**Usage:**
+- Track original WCS subscription
+- Maintain bidirectional relationship
+- Enable cross-referencing between systems
+
+**Retrieval:**
+```php
+$sublium_subscription->get_meta( 'wcs_subscription_id' );
+```
+
+### Plan Data Structure
+
+**Meta Key:** `plan_data`
+
+**Purpose:** Stores complete plan configuration for recurring payments (when `plan_id` is `0`)
+
+**Structure:**
+```php
+array(
+    'plan_id' => 0, // Always 0 for migrated subscriptions
+    'type' => 1|2, // Plan type
+    'billing_frequency' => 1,
+    'billing_interval' => 1|2|3|4,
+    'billing_length' => 0,
+    'free_trial' => 0,
+    'signup_fee' => array(
+        'signup_fee_type' => 'fixed',
+        'signup_amount' => '49.99'
+    ),
+    'relation_data' => array(
+        'regular_price' => '29.99',
+        'sale_price' => '0.00',
+        // ... other relation data
+    ),
+    // ... other plan fields
+)
+```
+
+**Note:** For migrated subscriptions, `plan_id` is set to `0` and `plan_data` contains the full plan configuration in meta.
+
+## Parent Order ID Mapping
+
+**WCS Field:** `WC_Subscription::get_id()` (subscription ID)
+
+**Sublium Field:** `parent_order_id`
+
+**Mapping:** Stores WCS subscription ID (not parent order ID) for better traceability
+
+**Rationale:**
+- Direct reference to source WCS subscription
+- Easier to trace back to original subscription
+- Maintains clear relationship between systems
+
+## Order Linking Meta
+
+### Parent Order
+
+**Meta Key:** `_sublium_wcs_subscription_id`
+
+**Value:** Sublium subscription ID
+
+**Location:** Parent order meta (HPOS: `wp_wc_orders_meta`, CPT: `wp_postmeta`)
+
+### Renewal Orders
+
+**Meta Key:** `_sublium_wcs_subscription_id`
+
+**Value:** Sublium subscription ID
+
+**Additional Meta:** `_sublium_wcs_subscription_renewal` = `'yes'`
+
+**Location:** Renewal order meta (HPOS: `wp_wc_orders_meta`, CPT: `wp_postmeta`)
+
+**Implementation:** Uses direct database queries for reliability across HPOS and CPT modes

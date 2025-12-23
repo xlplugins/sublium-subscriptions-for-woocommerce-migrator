@@ -49,15 +49,15 @@ POST /wp-json/sublium/v1/migration/rollback               # Rollback migration
 
 ```php
 array(
-    'stage' => 'plan_migration' | 'subscription_migration' | 'completed' | 'paused',
-    'plan_migration' => array(
+    'status' => 'idle' | 'products_migrating' | 'subscriptions_migrating' | 'completed' | 'paused',
+    'products_migration' => array(
         'total_products' => 0,
         'processed_products' => 0,
         'created_plans' => 0,
         'failed_products' => 0,
         'last_product_id' => 0,
     ),
-    'subscription_migration' => array(
+    'subscriptions_migration' => array(
         'total_subscriptions' => 0,
         'processed_subscriptions' => 0,
         'created_subscriptions' => 0,
@@ -66,17 +66,25 @@ array(
     ),
     'start_time' => '',
     'end_time' => '',
+    'last_activity' => '',
     'errors' => array(),
+    'progress' => array(
+        'products' => 0,
+        'subscriptions' => 0,
+    ),
 )
 ```
 
 ## Batch Processing
 
 - Process subscriptions in batches to avoid memory issues
-- Configurable batch size (default: 50)
+- Configurable batch size (default: 50, can be set to 1 for testing)
+- Uses WordPress cron (`wp_schedule_single_event`) for background processing
 - Save progress after each batch
 - Allow resumption from last processed item
 - Handle timeouts gracefully
+- Restart-safe: Can resume from any interruption
+- Uses `spawn_cron()` to trigger immediate execution when possible
 
 ## Error Recovery
 

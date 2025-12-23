@@ -38,19 +38,26 @@
 - Show plans created
 - Progress bar for plan creation
 - Product type breakdown (native vs WCS_ATT)
+- "Start Product Migration" button
 
 **Stage 2: Subscription Migration** (disabled until Stage 1 completes)
 - Show subscriptions to migrate
 - Progress bar for subscription migration
 - Success/failure counts
+- **Gateway Compatibility Warning**: Before starting migration, check gateway compatibility
+  - If readiness status is "partial" or "blocked", show alert dialog
+  - Display list of incompatible gateways with subscription counts
+  - Require user confirmation before proceeding
+  - "Start Subscription Migration" button triggers warning if needed
 
 ### Migration Controls
 
-- "Migrate Plans" button (Stage 1)
-- "Migrate Subscriptions" button (Stage 2, enabled after Stage 1)
-- "Start Full Migration" button (runs both stages sequentially)
-- Pause/Resume buttons
-- Rollback button
+- "Start Product Migration" button (Stage 1)
+- "Start Subscription Migration" button (Stage 2, enabled after Stage 1)
+  - Shows gateway compatibility warning if incompatible gateways detected
+  - Requires user confirmation before proceeding
+- "Reset/Cancel" button - Resets migration state
+- Progress tracking with real-time updates
 
 ### Real-time Progress
 

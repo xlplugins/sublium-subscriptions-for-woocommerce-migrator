@@ -2,85 +2,131 @@
 
 ## Overview
 
-This phase migrates subscriptions from WCS to Sublium, linking them to plans created in Phase 4.
+This phase migrates subscriptions from WCS to Sublium using `plan_data` directly in subscription meta (no actual plan creation required).
 
-## Files to Create
+## Implementation File
 
-- `includes/migration/importers/class-base-importer.php` - Base importer
-- `includes/migration/importers/class-subscription-importer.php` - Import subscriptions
-- `includes/migration/importers/class-item-importer.php` - Import line items
+- `includes/migration/subscriptions-processor.php` - Handles subscription migration
 
 ## Import Process
 
-### 1. Plan Lookup (using mapping from Phase 4)
+### 1. Gateway Compatibility Check
 
-- Get product_id and variation_id from subscription line item
-- **Verify product is migratable:**
-  - Check if product has `_product_type = 'subscription'` or `'variable-subscription'` (native)
-  - **OR** check if product has `_wcsatt_schemes` meta AND WCS_ATT plugin is active
-  - Skip subscription if product doesn't meet either condition (log warning)
-- Lookup plan_id from product_plan_mapping
-- Verify plan exists (fail gracefully if not found)
+- **Pre-migration Warning**: Check gateway compatibility before starting migration
+- If gateway is not supported by Sublium, show warning to admin
+- Admin must confirm before proceeding with subscription migration
+- Unsupported gateways are logged as warnings but migration continues
 
-### 2. Subscription Creation
+### 2. Subscription Data Extraction
 
-- Insert into `wp_sublium_wcs_subscriptions`
-- Set all dates (start, next_payment, trial_end, end)
-- **Trial End Date Handling:**
-  - Extract `_schedule_trial_end` from WCS subscription
-  - Convert GMT to UTC format
-  - Store in `trial_end_date_utc` field
-  - If trial already ended, set `trial_end_date` accordingly
-- Set billing schedule (period, interval)
-- Set payment info (gateway, mode)
-- Set totals and currency
-- **Note:** Signup fees are handled at order level in WCS, not subscription level
-  - Signup fee was charged in parent order
-  - No need to store signup fee in subscription record
-  - Plan already has signup fee configuration for future subscriptions
+- Extract subscription data from WCS subscription object
+- Get product IDs and variation IDs from subscription items
+- Extract billing information from product (not subscription object):
+  - Use `WC_Subscriptions_Product::get_length()` for billing length
+  - Use `WC_Subscriptions_Product::get_trial_length()` for trial length
+  - Use `WC_Subscriptions_Product::get_trial_period()` for trial period
+  - Use `WC_Subscriptions_Product::get_sign_up_fee()` for signup fee
+- Create `plan_data` structure matching Sublium's plan format
+- **Critical**: Store `plan_data` in subscription meta, set `plan_id` to `0`
 
-### 3. Line Items Import
+### 3. Subscription Creation
 
-- Insert into `wp_sublium_wcs_subscription_items`
-- Link to subscription
-- Preserve product IDs, quantities, prices
-- Preserve line item meta data
+- Create subscription using `Subscription::create()` with:
+  - `plan_id` set to `array('0')` (indicates plan_data is used)
+  - `plan_data` stored in `meta_data` array
+  - `parent_order_id` set to **WCS subscription ID** (not parent order ID)
+  - All dates preserved (created_at, next_payment_date, etc.)
+- **Created Date Preservation**: After creation, directly update database to preserve original WCS `created_at` dates (since `Subscription::save()` overrides them during creation)
 
-### 4. Meta Data Import
+### 4. Line Items Import
 
-- Insert payment tokens into `wp_sublium_wcs_subscription_meta`
-- Preserve gateway-specific tokens
-- Store original WCS subscription ID for reference (`_wcs_original_subscription_id`)
+- Add items using `Subscription::add_item()` with nested structure:
+  ```php
+  array(
+      'item_type' => 1, // Product item
+      'item_data' => array(
+          'product_id' => ...,
+          'variation_id' => ...,
+          'quantity' => ...,
+          'name' => ...,
+          'subtotal' => ...,
+          'total' => ...,
+          // ... other item data
+      )
+  )
+  ```
+- Call `Subscription::update_items()` after adding all items to link them correctly
 
-### 5. Activity Logging
+### 5. Meta Data Import
 
-- Create activity entry: "Migrated from WooCommerce Subscriptions"
+- Store `plan_data` in subscription meta (for recurring payments)
+- Store `wcs_subscription_id` in subscription meta (for maintaining relationship)
+- Store billing details, shipping details, payment method title
+- Store trial end date if exists
+- All meta stored in `wp_sublium_wcs_subscription_meta` table
+
+### 6. Order Linking
+
+- Link parent order and renewal orders to Sublium subscription
+- Use direct database queries (not native WooCommerce functions) for reliability
+- Add `_sublium_wcs_subscription_id` meta to parent order
+- Add `_sublium_wcs_subscription_id` meta to all renewal orders
+- Add `_sublium_wcs_subscription_renewal='yes'` meta to renewal orders
+- Works with both HPOS and CPT modes
+
+### 7. Activity Logging
+
+- Create activity entry: "Migrated from WooCommerce Subscriptions - Subscription #X"
 - Store migration metadata
 - Set user_type as 'system'
 
 ## Key Methods
 
 ```php
-import_subscription($wcs_subscription_id) - Import single subscription
-import_subscriptions_batch($limit, $offset) - Batch import
-lookup_plan_for_product($product_id, $variation_id) - Get plan_id from mapping
-create_subscription_record($subscription_data) - Insert subscription into database
-import_subscription_items($subscription_id, $line_items) - Import line items
-import_subscription_meta($subscription_id, $meta_data) - Import meta data
-log_migration_activity($subscription_id, $message) - Create activity log entry
+process_batch($offset) - Process batch of subscriptions
+migrate_subscription($wcs_subscription) - Migrate single subscription
+extract_subscription_data($wcs_subscription) - Extract and transform subscription data
+create_plan_data_from_subscription($wcs_subscription, $parent_order) - Create plan_data structure
+add_subscription_items($sublium_subscription, $wcs_subscription) - Add line items
+link_orders_to_sublium_subscription($wcs_subscription, $sublium_subscription_id) - Link orders via DB queries
+is_gateway_supported_by_sublium($gateway_id) - Check gateway compatibility
 ```
 
 ## Data Mapping
 
 - WCS subscription → Sublium subscription record
-- WCS line items → Sublium subscription_items records
-- WCS payment meta → Sublium subscription_meta records
-- WCS dates → Sublium UTC dates
+- WCS subscription ID → `parent_order_id` field (for traceability)
+- WCS subscription ID → `wcs_subscription_id` meta field (for relationship)
+- WCS line items → Sublium subscription_items records (nested structure)
+- WCS product subscription settings → `plan_data` in subscription meta
+- WCS dates → Sublium UTC dates (preserved via direct DB update)
 - WCS status → Sublium status (mapped)
+- WCS parent order → Linked via `_sublium_wcs_subscription_id` meta
+- WCS renewal orders → Linked via `_sublium_wcs_subscription_id` meta + `_sublium_wcs_subscription_renewal='yes'`
+
+## Plan Data Structure
+
+Instead of creating actual plans, subscription migration stores `plan_data` directly in subscription meta:
+
+```php
+'plan_data' => array(
+    'plan_id' => 0, // Always 0 for migrated subscriptions
+    'type' => 1|2, // 1=Subscribe & Save, 2=Recurring
+    'billing_frequency' => 1,
+    'billing_interval' => 1|2|3|4, // 1=days, 2=weeks, 3=months, 4=years
+    'billing_length' => 0, // 0=unlimited
+    'free_trial' => 0, // Days
+    'signup_fee' => array(...), // JSON structure
+    'relation_data' => array(...), // Plan relation data
+    // ... other plan fields
+)
+```
 
 ## Error Handling
 
-- Skip subscriptions with non-migratable products (log warning)
-- Skip subscriptions without matching plans (log error)
+- Check gateway compatibility before migration (show warning if incompatible)
+- Skip subscriptions without parent order (log error)
+- Skip subscriptions without valid product data (log error)
 - Continue processing on individual failures
-- Track failed subscriptions for retry
+- Track failed subscriptions in migration state
+- Log all errors with subscription ID and error message
