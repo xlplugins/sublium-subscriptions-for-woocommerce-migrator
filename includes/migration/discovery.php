@@ -143,18 +143,18 @@ class Discovery {
 	 * @return int Number of active subscriptions.
 	 */
 	public function get_active_subscription_count() {
-		// Use WCS native function to get active subscriptions.
+		// Use WCS native function to get all subscriptions (including on-hold, cancelled, etc.).
 		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
 			return 0;
 		}
 
 		try {
-			// Get active and pending-cancel subscriptions (both are considered "active" for migration).
+			// Get all subscriptions regardless of status (active, on-hold, cancelled, expired, etc.).
 			$subscriptions = wcs_get_subscriptions(
 				array(
-					'subscription_status' => array( 'active', 'pending-cancel' ),
-					'limit'               => -1,
-					'return'              => 'ids',
+					'status'  => 'any', // Get all subscription statuses.
+					'limit'   => -1,
+					'return'  => 'ids',
 				)
 			);
 

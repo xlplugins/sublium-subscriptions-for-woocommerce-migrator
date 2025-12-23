@@ -154,12 +154,12 @@ class Subscriptions_Processor {
 
 		$subscriptions = wcs_get_subscriptions(
 			array(
-				'subscription_status' => array( 'active', 'pending-cancel' ), // Match discovery query - only migrate active subscriptions.
-				'limit'               => $limit,
-				'offset'              => $offset,
-				'orderby'             => 'ID',
-				'order'               => 'ASC',
-				'return'              => 'ids',
+				'status'  => 'any', // Migrate all subscriptions including on-hold, cancelled, expired, etc.
+				'limit'   => $limit,
+				'offset'  => $offset,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+				'return'  => 'ids',
 			)
 		);
 
