@@ -25,7 +25,7 @@ class Subscriptions_Processor {
 	 *
 	 * @var int
 	 */
-	private $batch_size = 1; // Set to 1 for testing progress bar updates.
+	private $batch_size = 3; // Set to 1 for testing progress bar updates.
 
 	/**
 	 * Process a batch of subscriptions.
@@ -820,6 +820,7 @@ class Subscriptions_Processor {
 		}
 
 		// Get renewal orders using direct database query.
+		$renewal_order_ids = array();
 		if ( $is_hpos ) {
 			// HPOS mode: Query wc_orders_meta table.
 			$renewal_order_ids = $wpdb->get_col(
@@ -846,6 +847,11 @@ class Subscriptions_Processor {
 			);
 		}
 
+		// Ensure renewal_order_ids is an array.
+		if ( ! is_array( $renewal_order_ids ) ) {
+			$renewal_order_ids = array();
+		}
+
 		if ( ! empty( $renewal_order_ids ) ) {
 			$order_ids = array_merge( $order_ids, array_map( 'absint', $renewal_order_ids ) );
 		}
@@ -864,8 +870,8 @@ class Subscriptions_Processor {
 				continue;
 			}
 
-			// Check if this is a renewal order.
-			$is_renewal = in_array( $order_id, array_map( 'absint', $renewal_order_ids ), true );
+			// Check if this is a renewal order (explicitly exclude parent order).
+			$is_renewal = ! empty( $parent_order_id ) && absint( $order_id ) !== absint( $parent_order_id ) && in_array( $order_id, array_map( 'absint', $renewal_order_ids ), true );
 
 			if ( $is_hpos ) {
 				// HPOS mode: Update wc_orders_meta table.
