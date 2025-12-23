@@ -32,7 +32,26 @@ class State {
 	 */
 	public function get_state() {
 		$state = get_option( self::STATE_OPTION_NAME, array() );
-		return is_array( $state ) ? $state : $this->get_default_state();
+		$default_state = $this->get_default_state();
+		
+		// Merge with defaults to ensure all keys exist.
+		if ( is_array( $state ) ) {
+			$state = array_merge( $default_state, $state );
+			// Ensure nested arrays are merged too.
+			if ( isset( $state['products_migration'] ) && is_array( $state['products_migration'] ) ) {
+				$state['products_migration'] = array_merge( $default_state['products_migration'], $state['products_migration'] );
+			} else {
+				$state['products_migration'] = $default_state['products_migration'];
+			}
+			if ( isset( $state['subscriptions_migration'] ) && is_array( $state['subscriptions_migration'] ) ) {
+				$state['subscriptions_migration'] = array_merge( $default_state['subscriptions_migration'], $state['subscriptions_migration'] );
+			} else {
+				$state['subscriptions_migration'] = $default_state['subscriptions_migration'];
+			}
+			return $state;
+		}
+		
+		return $default_state;
 	}
 
 	/**

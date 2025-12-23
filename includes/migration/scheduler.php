@@ -150,6 +150,11 @@ class Scheduler {
 		$state = new State();
 		$current_state = $state->get_state();
 
+		// Ensure status is set.
+		if ( ! isset( $current_state['status'] ) ) {
+			$current_state['status'] = 'idle';
+		}
+
 		// Check if subscriptions migration already in progress.
 		if ( 'subscriptions_migrating' === $current_state['status'] ) {
 			return array(
@@ -335,13 +340,18 @@ class Scheduler {
 		$state = new State();
 		$current_state = $state->get_state();
 
+		// Ensure status is set.
+		if ( ! isset( $current_state['status'] ) ) {
+			$current_state['status'] = 'idle';
+		}
+
 		if ( 'paused' !== $current_state['status'] ) {
 			return;
 		}
 
 		// Determine which stage to resume.
-		$products_progress = $current_state['products_migration'];
-		$subscriptions_progress = $current_state['subscriptions_migration'];
+		$products_progress = isset( $current_state['products_migration'] ) ? $current_state['products_migration'] : array();
+		$subscriptions_progress = isset( $current_state['subscriptions_migration'] ) ? $current_state['subscriptions_migration'] : array();
 
 		if ( $products_progress['processed_products'] < $products_progress['total_products'] ) {
 			// Resume products migration.

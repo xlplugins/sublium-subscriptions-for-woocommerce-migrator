@@ -869,10 +869,10 @@ class Subscriptions_Processor {
 
 			if ( $is_hpos ) {
 				// HPOS mode: Update wc_orders_meta table.
-				// Check if meta already exists.
+				// Check if meta already exists (HPOS uses 'id' as primary key, not 'meta_id').
 				$existing_meta = $wpdb->get_var(
 					$wpdb->prepare(
-						"SELECT meta_id
+						"SELECT id
 						FROM {$wpdb->prefix}wc_orders_meta
 						WHERE order_id = %d
 						AND meta_key = %s
@@ -911,7 +911,7 @@ class Subscriptions_Processor {
 				if ( $is_renewal ) {
 					$existing_renewal_meta = $wpdb->get_var(
 						$wpdb->prepare(
-							"SELECT meta_id
+							"SELECT id
 							FROM {$wpdb->prefix}wc_orders_meta
 							WHERE order_id = %d
 							AND meta_key = %s
