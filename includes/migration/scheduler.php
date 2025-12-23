@@ -306,6 +306,9 @@ class Scheduler {
 			$current_state = $state->get_state();
 			$current_state['end_time'] = current_time( 'mysql' );
 			$state->update_state( $current_state );
+
+			// Trigger post-migration hook.
+			do_action( 'wcs_sublium_migration_completed', $current_state );
 		}
 	}
 

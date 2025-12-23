@@ -214,6 +214,9 @@ class WCS_Sublium_Migrator {
 		// Initialize API.
 		WCS_Sublium_Migrator\API\Migration_API::get_instance();
 
+		// Initialize WCS renewal blocker (always active to prevent renewals for migrated subscriptions).
+		WCS_Sublium_Migrator\Migration\WCS_Renewal_Blocker::get_instance();
+
 		// Register activation/deactivation hooks.
 		register_activation_hook( __FILE__, array( $this, 'activate' ) );
 		register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );

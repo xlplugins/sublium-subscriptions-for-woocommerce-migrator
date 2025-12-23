@@ -22,6 +22,8 @@
 			$(document).on('click', '.wcs-migrator-resume', this.handleResumeMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-cancel', this.handleCancelMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-reset', this.handleResetMigration.bind(this));
+			$(document).on('click', '.wcs-migrator-load-products', this.handleLoadProducts.bind(this));
+			$(document).on('click', '.wcs-migrator-convert-product', this.handleConvertProduct.bind(this));
 		},
 
 		loadFeasibility: function() {
@@ -343,6 +345,38 @@
 							</ul>
 						</div>
 					` : ''}
+
+					<div class="wcs-migrator-post-migration">
+						<h2>Post-Migration Tools</h2>
+
+						<div class="wcs-migrator-post-migration-section">
+							<h3>WCS Renewal Blocking</h3>
+							<p>WCS renewals are automatically blocked for migrated subscriptions via action scheduler hooks. No manual action required.</p>
+						</div>
+
+						<div class="wcs-migrator-post-migration-section">
+							<h3>Convert Subscription Products</h3>
+							<p>Convert subscription products to regular simple products (only if no active subscriptions).</p>
+							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-load-products">
+								Load Products
+							</button>
+							<div class="wcs-migrator-products-list" style="display: none;">
+								<table class="wp-list-table widefat fixed striped">
+									<thead>
+										<tr>
+											<th>Product Name</th>
+											<th>Type</th>
+											<th>Active Subscriptions</th>
+											<th>Actions</th>
+										</tr>
+									</thead>
+									<tbody class="wcs-migrator-products-tbody">
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+
 					<div class="wcs-migrator-actions">
 						<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset">
 							${wcsSubliumMigrator.strings.resetMigration || 'Reset Migration'}
@@ -524,6 +558,99 @@
 					$message.remove();
 				});
 			}, 5000);
+		},
+
+		handleLoadProducts: function(e) {
+			e.preventDefault();
+			const $button = $(e.target);
+			$button.prop('disabled', true).text('Loading...');
+
+			$.ajax({
+				url: this.apiUrl + 'products/subscription-products',
+				method: 'GET',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function(response) {
+					if (response.success) {
+						WCSMigrator.renderProductsList(response.products);
+						$('.wcs-migrator-products-list').show();
+					} else {
+						WCSMigrator.showError('Failed to load products');
+					}
+					$button.prop('disabled', false).text('Load Products');
+				},
+				error: function() {
+					WCSMigrator.showError('Failed to load products');
+					$button.prop('disabled', false).text('Load Products');
+				}
+			});
+		},
+
+		renderProductsList: function(products) {
+			const $tbody = $('.wcs-migrator-products-tbody');
+			$tbody.empty();
+
+			if (products.length === 0) {
+				$tbody.html('<tr><td colspan="4">No subscription products found.</td></tr>');
+				return;
+			}
+
+			products.forEach(function(product) {
+				const row = `
+					<tr>
+						<td>${product.name}</td>
+						<td>${product.type}${product.is_wcsatt ? ' (WCS_ATT)' : ''}</td>
+						<td>${product.active_subscriptions}</td>
+						<td>
+							${product.can_convert ?
+								`<button class="button wcs-migrator-convert-product" data-product-id="${product.id}">Convert</button>` :
+								'<span class="description">Cannot convert (has active subscriptions)</span>'
+							}
+						</td>
+					</tr>
+				`;
+				$tbody.append(row);
+			});
+		},
+
+		handleConvertProduct: function(e) {
+			e.preventDefault();
+			const productId = $(e.target).data('product-id');
+			if (!productId) {
+				return;
+			}
+
+			if (!confirm('Are you sure you want to convert this product to a simple product? This action cannot be undone.')) {
+				return;
+			}
+
+			const $button = $(e.target);
+			$button.prop('disabled', true).text('Converting...');
+
+			$.ajax({
+				url: this.apiUrl + 'products/convert',
+				method: 'POST',
+				data: {
+					product_id: productId
+				},
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function(response) {
+					if (response.success) {
+						WCSMigrator.showSuccess(response.message || 'Product converted successfully');
+						WCSMigrator.handleLoadProducts(e);
+					} else {
+						WCSMigrator.showError(response.message || 'Failed to convert product');
+						$button.prop('disabled', false).text('Convert');
+					}
+				},
+				error: function() {
+					WCSMigrator.showError('Failed to convert product');
+					$button.prop('disabled', false).text('Convert');
+				}
+			});
 		}
 	};
 

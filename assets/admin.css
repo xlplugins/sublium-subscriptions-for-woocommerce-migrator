@@ -193,3 +193,47 @@
 	margin: 10px 0;
 	padding-left: 20px;
 }
+
+.wcs-migrator-post-migration {
+	margin-top: 30px;
+	padding-top: 30px;
+	border-top: 2px solid #ddd;
+}
+
+.wcs-migrator-post-migration-section {
+	margin: 20px 0;
+	padding: 20px;
+	background: #f9f9f9;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+}
+
+.wcs-migrator-post-migration-section h3 {
+	margin-top: 0;
+}
+
+.wcs-migrator-success-message {
+	padding: 15px;
+	background: #d4edda;
+	border: 1px solid #c3e6cb;
+	border-radius: 4px;
+	color: #155724;
+	margin-top: 10px;
+}
+
+.wcs-migrator-success-message p {
+	margin: 5px 0;
+}
+
+.wcs-migrator-products-list {
+	margin-top: 15px;
+}
+
+.wcs-migrator-products-list table {
+	width: 100%;
+}
+
+.wcs-migrator-products-list th {
+	background: #f7f7f7;
+	font-weight: 600;
+}

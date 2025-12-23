@@ -133,6 +133,39 @@ class Migration_API {
 				'permission_callback' => array( $this, 'check_permissions' ),
 			)
 		);
+
+		// Get subscription products endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/products/subscription-products',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_subscription_products' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
+
+		// Convert product endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/products/convert',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'convert_product' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
+
+		// Bulk convert products endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/products/bulk-convert',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'bulk_convert_products' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
 	}
 
 	/**
@@ -272,6 +305,102 @@ class Migration_API {
 			array(
 				'success' => true,
 				'message' => __( 'Migration cancelled', 'wcs-sublium-migrator' ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Get subscription products endpoint.
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 */
+	public function get_subscription_products( $request ) {
+		$converter = \WCS_Sublium_Migrator\Migration\Product_Converter::get_instance();
+		$products = $converter->get_subscription_products();
+
+		return new \WP_REST_Response(
+			array(
+				'success'  => true,
+				'products' => $products,
+				'count'    => count( $products ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Convert product endpoint.
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 */
+	public function convert_product( $request ) {
+		$product_id = $request->get_param( 'product_id' );
+		if ( empty( $product_id ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'Product ID is required', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
+		$converter = \WCS_Sublium_Migrator\Migration\Product_Converter::get_instance();
+		$result = $converter->convert_subscription_product_to_simple( absint( $product_id ) );
+
+		if ( $result['success'] ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => true,
+					'message' => $result['message'],
+				),
+				200
+			);
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => false,
+				'message' => $result['message'],
+			),
+			400
+		);
+	}
+
+	/**
+	 * Bulk convert products endpoint.
+	 *
+	 * @param \WP_REST_Request $request Request object.
+	 * @return \WP_REST_Response
+	 */
+	public function bulk_convert_products( $request ) {
+		$product_ids = $request->get_param( 'product_ids' );
+		if ( empty( $product_ids ) || ! is_array( $product_ids ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'Product IDs array is required', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
+		$converter = \WCS_Sublium_Migrator\Migration\Product_Converter::get_instance();
+		$result = $converter->bulk_convert_products( array_map( 'absint', $product_ids ) );
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'result'  => $result,
+				'message' => sprintf(
+					/* translators: %1$d: Success count, %2$d: Failed count */
+					__( 'Converted %1$d product(s) successfully, %2$d failed', 'wcs-sublium-migrator' ),
+					$result['success'],
+					$result['failed']
+				),
 			),
 			200
 		);
