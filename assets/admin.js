@@ -45,6 +45,9 @@
 				const discoveryData = discoveryResponse[0];
 				const statusData = statusResponse[0];
 
+				// Store discovery data for later use
+				WCSMigrator.discoveryData = discoveryData;
+
 				// Check if migration is in progress
 				if (statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused') {
 					WCSMigrator.renderProgress(statusData);
@@ -378,6 +381,33 @@
 
 		handleStartSubscriptionsMigration: function(e) {
 			e.preventDefault();
+
+			// Check gateway compatibility if discovery data is available
+			if (this.discoveryData && this.discoveryData.readiness) {
+				const readinessStatus = this.discoveryData.readiness.status;
+				
+				// If readiness is "partial", show detailed warning
+				if (readinessStatus === 'partial') {
+					const incompatibleGateways = this.discoveryData.gateways.filter(g => !g.compatible);
+					let warningMessage = '⚠️ WARNING: Some payment gateways are not compatible with Sublium.\n\n';
+					warningMessage += 'Incompatible Gateways:\n';
+					incompatibleGateways.forEach(gateway => {
+						warningMessage += `• ${gateway.gateway_title} (${gateway.gateway_id}) - ${gateway.subscription_count} subscription(s)\n`;
+						warningMessage += `  ${gateway.message}\n\n`;
+					});
+					warningMessage += 'Subscriptions using these gateways will be migrated but may require manual payment method updates.\n\n';
+					warningMessage += 'Do you want to proceed with the migration?';
+
+					if (!confirm(warningMessage)) {
+						return;
+					}
+				} else if (readinessStatus === 'blocked') {
+					alert('Migration is blocked. Please resolve the issues before proceeding.');
+					return;
+				}
+			}
+
+			// Standard confirmation
 			if (!confirm('Are you sure you want to start subscriptions migration? This will process all subscriptions in the background. Make sure products migration is completed first.')) {
 				return;
 			}
