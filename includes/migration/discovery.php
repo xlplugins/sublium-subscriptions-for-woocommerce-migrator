@@ -138,9 +138,9 @@ class Discovery {
 	}
 
 	/**
-	 * Get active subscription count.
+	 * Get subscription count (all statuses).
 	 *
-	 * @return int Number of active subscriptions.
+	 * @return int Number of subscriptions (including active, on-hold, cancelled, expired, etc.).
 	 */
 	public function get_active_subscription_count() {
 		// Use WCS native function to get all subscriptions (including on-hold, cancelled, etc.).
