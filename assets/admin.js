@@ -5,6 +5,7 @@
 		apiUrl: '',
 		nonce: '',
 		statusInterval: null,
+		discoveryData: null, // Store discovery data for gateway compatibility checks
 
 		init: function() {
 			this.apiUrl = wcsSubliumMigrator.apiUrl;
