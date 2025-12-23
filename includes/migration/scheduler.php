@@ -293,12 +293,8 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_subscriptions_batch( $offset = 0 ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_subscriptions_batch' => array( 'offset' => $offset, 'time' => current_time( 'mysql' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
 		$processor = new Subscriptions_Processor();
 		$result = $processor->process_batch( $offset );
-
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_subscriptions_process_result' => $result ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
@@ -310,7 +306,6 @@ class Scheduler {
 			$current_state = $state->get_state();
 			$current_state['end_time'] = current_time( 'mysql' );
 			$state->update_state( $current_state );
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_migration_complete' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 	}
 
@@ -366,11 +361,6 @@ class Scheduler {
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_products_batch' );
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_subscriptions_batch' );
 
-		// Clear debug log.
-		$debug_log_path = __DIR__ . '/debug.log';
-		if ( file_exists( $debug_log_path ) ) {
-			file_put_contents( $debug_log_path, '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-		}
 
 		$state = new State();
 		$state->reset_state();
