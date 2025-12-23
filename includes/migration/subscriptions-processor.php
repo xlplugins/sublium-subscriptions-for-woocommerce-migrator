@@ -34,16 +34,13 @@ class Subscriptions_Processor {
 	 * @return array Result.
 	 */
 	public function process_batch( $offset = 0 ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_process_batch_start' => array( 'offset' => $offset, 'batch_size' => $this->batch_size, 'time' => current_time( 'mysql' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		$state         = new State();
 		$current_state = $state->get_state();
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_current_state' => $current_state ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Check if paused.
 		if ( 'paused' === $current_state['status'] ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_paused' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return array(
 				'success'  => false,
 				'has_more' => false,
@@ -53,7 +50,6 @@ class Subscriptions_Processor {
 
 		// Get subscriptions batch.
 		$subscriptions = $this->get_subscriptions_batch( $offset, $this->batch_size );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_fetched_subscriptions' => array( 'count' => count( $subscriptions ), 'subscription_ids' => array_map( function( $sub ) { return is_a( $sub, 'WC_Subscription' ) ? $sub->get_id() : 'not_wc_subscription'; }, $subscriptions ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		$processed     = 0;
 		$created       = 0;
@@ -62,7 +58,6 @@ class Subscriptions_Processor {
 		foreach ( $subscriptions as $wcs_subscription ) {
 			try {
 				$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_migrating' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 				// Check gateway support before migration.
 				$gateway = $wcs_subscription->get_payment_method();
@@ -89,10 +84,8 @@ class Subscriptions_Processor {
 				$result = $this->migrate_subscription( $wcs_subscription );
 				if ( $result ) {
 					++$created;
-					file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_migrated_success' => array( 'subscription_id' => $subscription_id, 'sublium_id' => $result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				} else {
 					++$failed;
-					file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_migrated_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 					$state->add_error(
 						sprintf( 'Failed to migrate subscription %d', $subscription_id ),
 						array( 'subscription_id' => $subscription_id )
@@ -102,7 +95,6 @@ class Subscriptions_Processor {
 			} catch ( \Exception $e ) {
 				++$failed;
 				$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_processor_migrated_exception' => array( 'subscription_id' => $subscription_id, 'error' => $e->getMessage() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				$state->add_error(
 					sprintf( 'Error migrating subscription %d: %s', $subscription_id, $e->getMessage() ),
 					array( 'subscription_id' => $subscription_id )
@@ -155,10 +147,8 @@ class Subscriptions_Processor {
 	 * @return array Array of WC_Subscription objects.
 	 */
 	private function get_subscriptions_batch( $offset, $limit ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'get_subscriptions_batch_start' => array( 'offset' => $offset, 'limit' => $limit, 'wcs_function_exists' => function_exists( 'wcs_get_subscriptions' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'wcs_get_subscriptions_not_available' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return array();
 		}
 
@@ -173,10 +163,8 @@ class Subscriptions_Processor {
 			)
 		);
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'wcs_get_subscriptions_result' => array( 'count' => is_array( $subscriptions ) ? count( $subscriptions ) : 0, 'ids' => is_array( $subscriptions ) ? $subscriptions : 'not_array' ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $subscriptions ) || ! is_array( $subscriptions ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'no_subscriptions_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return array();
 		}
 
@@ -187,11 +175,9 @@ class Subscriptions_Processor {
 			if ( $subscription && is_a( $subscription, 'WC_Subscription' ) ) {
 				$subscription_objects[] = $subscription;
 			} else {
-				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscription_not_found_or_invalid' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscription_objects_count' => count( $subscription_objects ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		return $subscription_objects;
 	}
@@ -204,15 +190,12 @@ class Subscriptions_Processor {
 	 */
 	private function migrate_subscription( $wcs_subscription ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'migrate_subscription_start' => array( 'subscription_id' => $subscription_id, 'is_wc_subscription' => is_a( $wcs_subscription, 'WC_Subscription' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! is_a( $wcs_subscription, 'WC_Subscription' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'not_wc_subscription' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
 		if ( ! class_exists( '\Sublium_WCS\Includes\Controller\Subscriptions\Subscription' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'sublium_subscription_class_not_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -221,7 +204,6 @@ class Subscriptions_Processor {
 		if ( ! empty( $existing_sublium_id ) ) {
 			$sublium_subscription = sublium_get_subscription($existing_sublium_id);
 			if($sublium_subscription->exists){
-				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscription_already_migrated' => array( 'wcs_id' => $subscription_id, 'sublium_id' => $existing_sublium_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				return absint( $existing_sublium_id );
 			}
 
@@ -229,10 +211,8 @@ class Subscriptions_Processor {
 
 		// Extract subscription data from WCS subscription.
 		$subscription_data = $this->extract_subscription_data( $wcs_subscription );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_subscription_data_result' => array( 'subscription_id' => $subscription_id, 'has_data' => ! empty( $subscription_data ), 'data_keys' => ! empty( $subscription_data ) ? array_keys( $subscription_data ) : array() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $subscription_data ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_subscription_data_empty' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -307,30 +287,23 @@ class Subscriptions_Processor {
 	 */
 	private function extract_subscription_data( $wcs_subscription ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_subscription_data_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! is_a( $wcs_subscription, 'WC_Subscription' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_not_wc_subscription' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
 		// Get parent order.
 		$parent_order = $wcs_subscription->get_parent();
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_parent_order_check' => array( 'subscription_id' => $subscription_id, 'has_parent' => ! empty( $parent_order ), 'parent_id' => $parent_order ? $parent_order->get_id() : 0 ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! $parent_order ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_no_parent_order' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
 		// Create plan_data from subscription data.
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_creating_plan_data_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		$plan_data = $this->create_plan_data_from_subscription( $wcs_subscription, $parent_order );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_create_plan_data_result' => array( 'subscription_id' => $subscription_id, 'has_plan_data' => ! empty( $plan_data ), 'plan_data_keys' => ! empty( $plan_data ) && is_array( $plan_data ) ? array_keys( $plan_data ) : array() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $plan_data ) || ! is_array( $plan_data ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'extract_plan_data_creation_failed' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -490,7 +463,6 @@ class Subscriptions_Processor {
 	 */
 	private function create_plan_data_from_subscription( $wcs_subscription, $parent_order ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_from_subscription_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		try {
 			// Get product IDs from subscription items.
@@ -502,10 +474,8 @@ class Subscriptions_Processor {
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_product_ids' => array( 'subscription_id' => $subscription_id, 'product_ids' => $product_ids, 'count' => count( $product_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $product_ids ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -529,14 +499,12 @@ class Subscriptions_Processor {
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'billing_length' => $billing_length, 'trial_length' => $trial_length, 'trial_period' => $trial_period, 'signup_fee' => $signup_fee ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Convert to Sublium format.
 		$interval   = $this->convert_period_to_interval( $billing_period );
 		$frequency  = $billing_interval;
 		$trial_days = $this->convert_trial_to_days( $trial_length, $trial_period );
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_converted' => array( 'subscription_id' => $subscription_id, 'interval' => $interval, 'frequency' => $frequency, 'trial_days' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Determine plan type based on product (virtual = Recurring, physical = Subscribe & Save).
 		$plan_type = 2; // Default to Recurring.
@@ -545,12 +513,10 @@ class Subscriptions_Processor {
 			$plan_type = 1; // Subscribe & Save.
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_plan_type' => array( 'subscription_id' => $subscription_id, 'plan_type' => $plan_type, 'product_is_virtual' => $first_product ? $first_product->is_virtual() : 'no_product' ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Generate plan title from billing period.
 		$plan_title = $this->generate_plan_title( $billing_period, $billing_interval );
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_title' => array( 'subscription_id' => $subscription_id, 'plan_title' => $plan_title ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Prepare signup fee data.
 		$signup_fee_data = array(
@@ -597,7 +563,6 @@ class Subscriptions_Processor {
 			);
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_relation_data' => array( 'subscription_id' => $subscription_id, 'relation_data' => $relation_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Build plan_data structure matching Sublium's plan format.
 		$plan_data = array(
@@ -618,14 +583,11 @@ class Subscriptions_Processor {
 			'subscription_id'    => $subscription_id, // Store original subscription ID for reference.
 		);
 
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_success' => array( 'subscription_id' => $subscription_id, 'plan_data' => $plan_data ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 			return $plan_data;
 		} catch ( \Exception $e ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_exception' => array( 'subscription_id' => $subscription_id, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		} catch ( \Error $e ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_data_fatal_error' => array( 'subscription_id' => $subscription_id, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 	}
@@ -639,10 +601,8 @@ class Subscriptions_Processor {
 	 */
 	private function find_matching_plan( $wcs_subscription ) {
 		$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_matching_plan_start' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) || ! class_exists( '\Sublium_WCS\Includes\database\Plan' ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_classes_not_found' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -660,10 +620,8 @@ class Subscriptions_Processor {
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_product_ids' => array( 'subscription_id' => $subscription_id, 'product_ids' => $product_ids, 'variation_ids' => $variation_ids ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $product_ids ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_product_ids' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -683,14 +641,12 @@ class Subscriptions_Processor {
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_billing_info' => array( 'subscription_id' => $subscription_id, 'billing_period' => $billing_period, 'billing_interval' => $billing_interval, 'trial_length' => $trial_length, 'trial_period' => $trial_period ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Convert to Sublium format.
 		$interval   = $this->convert_period_to_interval( $billing_period );
 		$frequency  = $billing_interval;
 		$trial_days = $this->convert_trial_to_days( $trial_length, $trial_period );
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_converted' => array( 'subscription_id' => $subscription_id, 'interval' => $interval, 'frequency' => $frequency, 'trial_days' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Find plan relations for products/variations.
 		$plan_relations_db = new \Sublium_WCS\Includes\database\PlanRelations();
@@ -707,7 +663,6 @@ class Subscriptions_Processor {
 				)
 			);
 
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_product_relations' => array( 'subscription_id' => $subscription_id, 'product_id' => $product_id, 'relations_count' => is_array( $relations ) ? count( $relations ) : 0, 'relations' => $relations ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 			if ( ! empty( $relations ) && is_array( $relations ) ) {
 				foreach ( $relations as $relation ) {
@@ -732,7 +687,6 @@ class Subscriptions_Processor {
 						)
 					);
 
-					file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_variation_relations' => array( 'subscription_id' => $subscription_id, 'product_id' => $product_id, 'variation_id' => $variation_id, 'relations_count' => is_array( $relations ) ? count( $relations ) : 0, 'relations' => $relations ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 					if ( ! empty( $relations ) && is_array( $relations ) ) {
 						foreach ( $relations as $relation ) {
@@ -745,10 +699,8 @@ class Subscriptions_Processor {
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_collected_plan_ids' => array( 'subscription_id' => $subscription_id, 'plan_ids' => array_unique( $plan_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( empty( $plan_ids ) ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_plan_ids_found' => array( 'subscription_id' => $subscription_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return false;
 		}
 
@@ -762,18 +714,15 @@ class Subscriptions_Processor {
 
 			$plan = $plan_data[0];
 
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_checking_plan' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id, 'plan_billing_frequency' => isset( $plan['billing_frequency'] ) ? $plan['billing_frequency'] : 'not_set', 'plan_billing_interval' => isset( $plan['billing_interval'] ) ? $plan['billing_interval'] : 'not_set', 'plan_free_trial' => isset( $plan['free_trial'] ) ? $plan['free_trial'] : 'not_set', 'expected_frequency' => $frequency, 'expected_interval' => $interval, 'expected_trial' => $trial_days ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 			// Check if billing settings match.
 			if ( isset( $plan['billing_frequency'] ) && absint( $plan['billing_frequency'] ) === $frequency &&
 				isset( $plan['billing_interval'] ) && absint( $plan['billing_interval'] ) === $interval &&
 				isset( $plan['free_trial'] ) && absint( $plan['free_trial'] ) === $trial_days ) {
-				file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_match_found' => array( 'subscription_id' => $subscription_id, 'plan_id' => $plan_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 				return absint( $plan_id );
 			}
 		}
 
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'find_plan_no_match' => array( 'subscription_id' => $subscription_id, 'checked_plan_ids' => array_unique( $plan_ids ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		return false;
 	}
 
@@ -1252,7 +1201,6 @@ class Subscriptions_Processor {
 		);
 
 		$plan_group_id = $group_plans_db->create( $group_data );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'create_plan_group' => array( 'plan_group_id' => $plan_group_id, 'plan_type' => $plan_type, 'product_id' => $product_id ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		return $plan_group_id ? absint( $plan_group_id ) : false;
 	}
