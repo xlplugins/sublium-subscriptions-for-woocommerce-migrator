@@ -155,8 +155,9 @@
 
 					<div class="wcs-migrator-stats">
 						<div class="wcs-migrator-stat-card">
-							<h3>Active Subscriptions</h3>
+							<h3>Total Subscriptions</h3>
 							<p class="stat-value">${data.active_subscriptions}</p>
+							<p class="stat-note">(All statuses will be migrated)</p>
 						</div>
 						<div class="wcs-migrator-stat-card">
 							<h3>Simple Products</h3>
@@ -173,6 +174,28 @@
 						</div>
 						` : ''}
 					</div>
+
+					${data.subscription_statuses && Object.keys(data.subscription_statuses).length > 0 ? `
+					<div class="wcs-migrator-subscription-statuses">
+						<h3>Subscriptions by Status</h3>
+						<table>
+							<thead>
+								<tr>
+									<th>Status</th>
+									<th>Count</th>
+								</tr>
+							</thead>
+							<tbody>
+								${Object.entries(data.subscription_statuses).map(([status, count]) => `
+									<tr>
+										<td>${status.charAt(0).toUpperCase() + status.slice(1).replace(/-/g, ' ')}</td>
+										<td>${count}</td>
+									</tr>
+								`).join('')}
+							</tbody>
+						</table>
+					</div>
+					` : ''}
 
 					<div class="wcs-migrator-gateways">
 						<h3>Payment Gateways</h3>

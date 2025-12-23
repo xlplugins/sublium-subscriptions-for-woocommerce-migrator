@@ -170,6 +170,56 @@ class Discovery {
 	}
 
 	/**
+	 * Get subscription counts by status.
+	 *
+	 * @return array Subscription counts grouped by status.
+	 */
+	public function get_subscription_counts_by_status() {
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return array();
+		}
+
+		// Get all available WCS subscription statuses.
+		$wcs_statuses = array();
+		if ( function_exists( 'wcs_get_subscription_statuses' ) ) {
+			$wcs_statuses_raw = wcs_get_subscription_statuses();
+			// Extract status keys (remove 'wc-' prefix if present).
+			foreach ( $wcs_statuses_raw as $status_key => $status_label ) {
+				$clean_key = str_replace( 'wc-', '', $status_key );
+				$wcs_statuses[] = $clean_key;
+			}
+		} else {
+			// Fallback to common statuses if function not available.
+			$wcs_statuses = array( 'active', 'on-hold', 'cancelled', 'expired', 'pending', 'pending-cancel', 'switched' );
+		}
+
+		$status_counts = array();
+
+		// Count subscriptions for each status.
+		foreach ( $wcs_statuses as $status ) {
+			try {
+				$subscriptions = wcs_get_subscriptions(
+					array(
+						'subscription_status' => $status,
+						'limit'              => -1,
+						'return'             => 'ids',
+					)
+				);
+
+				$count = is_array( $subscriptions ) ? count( $subscriptions ) : 0;
+				if ( $count > 0 ) {
+					$status_counts[ $status ] = $count;
+				}
+			} catch ( \Exception $e ) {
+				// Skip status if query fails.
+				continue;
+			}
+		}
+
+		return $status_counts;
+	}
+
+	/**
 	 * Discover all payment gateways from active WCS subscriptions.
 	 *
 	 * @return array Gateway summary with counts and compatibility.
@@ -181,12 +231,12 @@ class Discovery {
 		}
 
 		try {
-			// Get active and pending-cancel subscriptions.
+			// Get all subscriptions (all statuses) for gateway discovery.
 			$subscriptions = wcs_get_subscriptions(
 				array(
-					'subscription_status' => array( 'active', 'pending-cancel' ),
-					'limit'               => -1,
-					'return'              => 'objects',
+					'status'  => 'any', // Get all subscription statuses.
+					'limit'  => -1,
+					'return' => 'objects',
 				)
 			);
 
@@ -412,6 +462,7 @@ class Discovery {
 	public function get_feasibility_data() {
 		$wcs_status = $this->check_wcs_plugin();
 		$active_subscriptions = $this->get_active_subscription_count();
+		$subscription_statuses = $this->get_subscription_counts_by_status();
 		$gateways = $this->discover_payment_gateways();
 		$products = $this->get_subscription_products_summary();
 
@@ -419,11 +470,12 @@ class Discovery {
 		$readiness = $this->calculate_readiness( $wcs_status, $gateways, $products, $active_subscriptions );
 
 		return array(
-			'wcs_status'          => $wcs_status,
+			'wcs_status'           => $wcs_status,
 			'active_subscriptions' => $active_subscriptions,
-			'gateways'            => $gateways,
-			'products'            => $products,
-			'readiness'           => $readiness,
+			'subscription_statuses' => $subscription_statuses,
+			'gateways'             => $gateways,
+			'products'             => $products,
+			'readiness'            => $readiness,
 		);
 	}
 
