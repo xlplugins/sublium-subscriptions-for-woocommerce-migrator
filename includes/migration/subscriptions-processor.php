@@ -25,7 +25,7 @@ class Subscriptions_Processor {
 	 *
 	 * @var int
 	 */
-	private $batch_size = 50;
+	private $batch_size = 1; // Set to 1 for testing progress bar updates.
 
 	/**
 	 * Process a batch of subscriptions.
