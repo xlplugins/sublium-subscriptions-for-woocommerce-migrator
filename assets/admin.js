@@ -386,7 +386,7 @@
 			// Check gateway compatibility if discovery data is available
 			if (this.discoveryData && this.discoveryData.readiness) {
 				const readinessStatus = this.discoveryData.readiness.status;
-				
+
 				// If readiness is "partial", show detailed warning
 				if (readinessStatus === 'partial') {
 					const incompatibleGateways = this.discoveryData.gateways.filter(g => !g.compatible);

@@ -458,7 +458,7 @@ class Subscriptions_Processor {
 		}
 
 		return array(
-			'parent_order_id'       => $parent_order->get_id(),
+			'parent_order_id'       => $wcs_subscription->get_id(), // Use WCS subscription ID instead of parent order ID.
 			'gateway'               => $gateway ? $gateway : 'manual',
 			'gateway_mode'          => 1,
 			'user_id'               => absint( $user_id ),
