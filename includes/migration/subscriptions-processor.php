@@ -820,7 +820,6 @@ class Subscriptions_Processor {
 		}
 
 		// Get renewal orders using direct database query.
-		$renewal_order_ids = array();
 		if ( $is_hpos ) {
 			// HPOS mode: Query wc_orders_meta table.
 			$renewal_order_ids = $wpdb->get_col(
@@ -845,11 +844,6 @@ class Subscriptions_Processor {
 					$wcs_subscription_id
 				)
 			);
-		}
-
-		// Ensure renewal_order_ids is an array.
-		if ( ! is_array( $renewal_order_ids ) ) {
-			$renewal_order_ids = array();
 		}
 
 		if ( ! empty( $renewal_order_ids ) ) {
@@ -913,7 +907,7 @@ class Subscriptions_Processor {
 					);
 				}
 
-				// Add renewal flag if this is a renewal order.
+				// Add renewal flag only if this is a renewal order (not the parent order).
 				if ( $is_renewal ) {
 					$existing_renewal_meta = $wpdb->get_var(
 						$wpdb->prepare(
@@ -954,7 +948,7 @@ class Subscriptions_Processor {
 				// CPT mode: Update postmeta table.
 				update_post_meta( $order_id, '_sublium_wcs_subscription_id', $sublium_subscription_id );
 
-				// Add renewal flag if this is a renewal order.
+				// Add renewal flag only if this is a renewal order (not the parent order).
 				if ( $is_renewal ) {
 					update_post_meta( $order_id, '_sublium_wcs_subscription_renewal', 'yes' );
 				}

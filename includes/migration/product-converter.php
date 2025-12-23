@@ -422,3 +422,4 @@ class Product_Converter {
 		return $result;
 	}
 }
+

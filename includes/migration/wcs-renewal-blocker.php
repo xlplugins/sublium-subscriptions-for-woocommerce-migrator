@@ -402,3 +402,4 @@ class WCS_Renewal_Blocker {
 		$state->update_state( $current_state );
 	}
 }
+

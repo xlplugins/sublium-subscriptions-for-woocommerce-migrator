@@ -195,3 +195,4 @@ class Post_Migration_Cleanup {
 		return array_map( 'absint', array_filter( $subscription_ids ) );
 	}
 }
+
