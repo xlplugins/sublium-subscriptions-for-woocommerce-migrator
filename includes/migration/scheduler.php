@@ -63,11 +63,6 @@ class Scheduler {
 		$state = new State();
 		$current_state = $state->get_state();
 
-		// Clear debug log when starting fresh migration.
-		$debug_log_path = __DIR__ . '/debug.log';
-		if ( file_exists( $debug_log_path ) ) {
-			file_put_contents( $debug_log_path, '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-		}
 
 		// Check if products migration already in progress.
 		if ( 'products_migrating' === $current_state['status'] ) {
@@ -234,17 +229,13 @@ class Scheduler {
 	 * @return void
 	 */
 	public function schedule_products_batch( $offset = 0 ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_products_batch' => array( 'offset' => $offset, 'timestamp' => time() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
 		// Check if already scheduled.
 		$scheduled = wp_next_scheduled( 'wcs_sublium_migrate_products_batch', array( $offset ) );
 		if ( $scheduled ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'already_scheduled' => array( 'offset' => $offset, 'scheduled_time' => $scheduled ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return;
 		}
 
 		$result = wp_schedule_single_event( time(), 'wcs_sublium_migrate_products_batch', array( $offset ) );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_result' => array( 'offset' => $offset, 'result' => $result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Trigger cron immediately if possible (for testing).
 		$disable_cron = defined( 'DISABLE_WP_CRON' ) && constant( 'DISABLE_WP_CRON' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core constant
@@ -260,17 +251,13 @@ class Scheduler {
 	 * @return void
 	 */
 	public function schedule_subscriptions_batch( $offset = 0 ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'schedule_subscriptions_batch' => array( 'offset' => $offset, 'timestamp' => time() ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
 		// Check if already scheduled.
 		$scheduled = wp_next_scheduled( 'wcs_sublium_migrate_subscriptions_batch', array( $offset ) );
 		if ( $scheduled ) {
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_already_scheduled' => array( 'offset' => $offset, 'scheduled_time' => $scheduled ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 			return;
 		}
 
 		$result = wp_schedule_single_event( time(), 'wcs_sublium_migrate_subscriptions_batch', array( $offset ) );
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'subscriptions_schedule_result' => array( 'offset' => $offset, 'result' => $result ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		// Trigger cron immediately if possible (for testing).
 		$disable_cron = defined( 'DISABLE_WP_CRON' ) && constant( 'DISABLE_WP_CRON' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- WordPress core constant
@@ -286,12 +273,8 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_products_batch( $offset = 0 ) {
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_products_batch' => array( 'offset' => $offset, 'time' => current_time( 'mysql' ) ) ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
-
 		$processor = new Products_Processor();
 		$result = $processor->process_batch( $offset );
-
-		file_put_contents( __DIR__ . '/debug.log', print_r( array( 'scheduler_process_result' => $result ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
@@ -300,7 +283,6 @@ class Scheduler {
 			// Products migration complete.
 			$state = new State();
 			$state->set_status( 'idle' );
-			file_put_contents( __DIR__ . '/debug.log', print_r( array( 'products_migration_complete' => true ), true ), FILE_APPEND ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_file_put_contents
 		}
 	}
 
