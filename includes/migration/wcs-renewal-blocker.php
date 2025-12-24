@@ -73,8 +73,58 @@ class WCS_Renewal_Blocker {
 		// Add admin notices and UI modifications.
 		add_action( 'admin_notices', array( $this, 'add_migration_notice' ) );
 		add_action( 'admin_footer', array( $this, 'hide_renewal_buttons' ) );
+		add_filter( 'wcs_get_subscription', array( $this, 'prevent_subscription_loading' ), 10, 2 );
 	}
+	/**
+	 * Prevent subscription from being loaded during scheduled renewal actions.
+	 *
+	 * This filter intercepts wcs_get_subscription() calls during scheduled renewal processing
+	 * to prevent migrated subscriptions from being processed by WCS renewal logic.
+	 *
+	 * @param \WC_Subscription|false $subscription Subscription object or false.
+	 * @param int|\WC_Subscription   $the_subscription Subscription ID or object passed to wcs_get_subscription().
+	 * @return \WC_Subscription|false Subscription object or false to prevent loading.
+	 */
+	/**
+	 * Prevent subscription from being loaded during scheduled renewal actions.
+	 *
+	 * This filter intercepts wcs_get_subscription() calls during scheduled renewal processing
+	 * to prevent migrated subscriptions from being processed by WCS renewal logic.
+	 *
+	 * @param \WC_Subscription|false $subscription Subscription object or false.
+	 * @return \WC_Subscription|false Subscription object or false to prevent loading.
+	 */
+	public function prevent_subscription_loading( $subscription ) {
+		// Only block during scheduled renewal actions (not during normal admin/frontend operations).
+		$is_scheduled_action = (
+			did_action( 'woocommerce_scheduled_subscription_payment' ) ||
+			did_action( 'woocommerce_scheduled_subscription_expiration' ) ||
+			did_action( 'woocommerce_scheduled_subscription_trial_end' ) ||
+			did_action( 'woocommerce_scheduled_subscription_end_of_prepaid_term' ) ||
+			did_action( 'woocommerce_scheduled_subscription_payment_retry' )
+		);
 
+		if ( ! $is_scheduled_action ) {
+			return $subscription; // Not a scheduled action, allow normal loading.
+		}
+
+		// If subscription is already false or not a valid subscription object, return as-is.
+		if ( ! $subscription || ! is_a( $subscription, 'WC_Subscription' ) ) {
+			return $subscription;
+		}
+
+		// Check if subscription is migrated.
+		if ( $this->is_subscription_migrated( $subscription ) ) {
+			$subscription_id = $subscription->get_id();
+			// Log blocked attempt.
+			$this->log_blocked_renewal( $subscription_id, 'subscription_loading_prevented' );
+
+			// Return false to prevent WCS from processing this subscription during scheduled actions.
+			return false;
+		}
+
+		return $subscription;
+	}
 	/**
 	 * Check if subscription is migrated.
 	 *
@@ -159,13 +209,28 @@ class WCS_Renewal_Blocker {
 		}
 
 		// Extract subscription ID from args.
+		// WCS Action Scheduler passes args as associative array: array( 'subscription_id' => $id )
+		// For payment_retry, it passes: array( 'order_id' => $order_id )
 		$subscription_id = 0;
 		if ( ! empty( $args ) && is_array( $args ) ) {
-			// WCS typically passes subscription_id as first arg.
-			if ( isset( $args[0] ) && is_numeric( $args[0] ) ) {
-				$subscription_id = absint( $args[0] );
-			} elseif ( isset( $args['subscription_id'] ) ) {
+			// Check for subscription_id key first (standard WCS format).
+			if ( isset( $args['subscription_id'] ) && is_numeric( $args['subscription_id'] ) ) {
 				$subscription_id = absint( $args['subscription_id'] );
+			} elseif ( isset( $args[0] ) && is_numeric( $args[0] ) ) {
+				// Fallback: check first array element (for compatibility).
+				$subscription_id = absint( $args[0] );
+			} elseif ( isset( $args['order_id'] ) && is_numeric( $args['order_id'] ) ) {
+				// For payment_retry, get subscription from order_id.
+				$order_id = absint( $args['order_id'] );
+				$order = wc_get_order( $order_id );
+				if ( $order && function_exists( 'wcs_get_subscriptions_for_order' ) ) {
+					$subscriptions = wcs_get_subscriptions_for_order( $order );
+					if ( ! empty( $subscriptions ) ) {
+						// Get first subscription ID from the order.
+						$subscription_ids = array_keys( $subscriptions );
+						$subscription_id = absint( $subscription_ids[0] );
+					}
+				}
 			}
 		}
 
@@ -203,6 +268,47 @@ class WCS_Renewal_Blocker {
 		remove_action( 'woocommerce_scheduled_subscription_payment', 'WC_Subscriptions_Manager::prepare_renewal', 10 );
 	}
 
+
+	/**
+	 * Prevent renewal order after creation (filter hook).
+	 *
+	 * @param \WC_Order|\WP_Error $renewal_order Renewal order or error.
+	 * @param \WC_Subscription     $subscription  Subscription object.
+	 * @return \WC_Order|\WP_Error Renewal order or error.
+	 */
+	public function prevent_renewal_order_after_creation( $renewal_order, $subscription ) {
+		if ( ! $this->is_subscription_migrated( $subscription ) ) {
+			return $renewal_order;
+		}
+
+		// Log blocked attempt.
+		$this->log_blocked_renewal( $subscription->get_id(), 'renewal_order_created' );
+
+		// If renewal order was created, cancel/delete it and return error.
+		if ( $renewal_order instanceof \WC_Order ) {
+			// Cancel the order to prevent processing.
+			$renewal_order->update_status( 'cancelled', __( 'Cancelled: Subscription has been migrated to Sublium', 'wcs-sublium-migrator' ) );
+
+			// Add order note.
+			$renewal_order->add_order_note(
+				sprintf(
+					/* translators: %d: Subscription ID */
+					esc_html__( 'This renewal order was cancelled because subscription #%d has been migrated to Sublium. Renewals are now handled by Sublium.', 'wcs-sublium-migrator' ),
+					esc_html( $subscription->get_id() )
+				)
+			);
+		}
+
+		// Return WP_Error to indicate failure.
+		return new \WP_Error(
+			'migrated_subscription',
+			sprintf(
+				/* translators: %d: Subscription ID */
+				__( 'This subscription (#%d) has been migrated to Sublium. Renewals are now handled by Sublium.', 'wcs-sublium-migrator' ),
+				esc_html( $subscription->get_id() )
+			)
+		);
+	}
 
 	/**
 	 * Prevent manual renewal order creation from admin order edit screen.
