@@ -25,7 +25,7 @@ class Products_Processor {
 	 *
 	 * @var int
 	 */
-	private $batch_size = 50;
+	private $batch_size = 3;
 
 	/**
 	 * Process a batch of products.
@@ -113,8 +113,24 @@ class Products_Processor {
 		);
 
 		// Check if more products exist.
-		$has_more    = count( $products ) === $this->batch_size;
+		$all_ids = $this->get_all_product_ids();
+		$total_products = count( $all_ids );
+		$has_more = ( $offset + count( $products ) ) < $total_products;
 		$next_offset = $has_more ? $offset + $this->batch_size : 0;
+
+		// Debug logging.
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf(
+				'WCS Migrator: Batch complete - offset=%d, processed=%d, created=%d, failed=%d, total_products=%d, has_more=%s, next_offset=%d',
+				$offset,
+				$processed,
+				$created,
+				$failed,
+				$total_products,
+				$has_more ? 'yes' : 'no',
+				$next_offset
+			) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 
 		return array(
 			'success'     => true,
@@ -127,25 +143,50 @@ class Products_Processor {
 	}
 
 	/**
-	 * Get products batch.
+	 * Get all product IDs to migrate (cached in state).
 	 *
-	 * @param int $offset Offset.
-	 * @param int $limit Limit.
 	 * @return array Product IDs.
 	 */
-	private function get_products_batch( $offset, $limit ) {
+	private function get_all_product_ids() {
+		$state = new State();
+		$current_state = $state->get_state();
+
+		// Check if we have cached product IDs in state.
+		if ( isset( $current_state['products_migration']['all_product_ids'] ) && is_array( $current_state['products_migration']['all_product_ids'] ) && ! empty( $current_state['products_migration']['all_product_ids'] ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Using cached product IDs (%d products)', count( $current_state['products_migration']['all_product_ids'] ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return $current_state['products_migration']['all_product_ids'];
+		}
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'WCS Migrator: Building product IDs list from scratch' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
 		$product_ids = array();
 
 		// Get native subscription products using WooCommerce native function.
+		// Exclude products that already have migration meta.
 		$native_products = wc_get_products(
 			array(
-				'type'    => array( 'subscription', 'variable-subscription' ),
-				'status'  => 'publish',
-				'limit'   => $limit,
-				'offset'  => $offset,
-				'orderby' => 'ID',
-				'order'   => 'ASC',
-				'return'  => 'ids',
+				'type'      => array( 'subscription', 'variable-subscription' ),
+				'status'    => 'publish',
+				'limit'     => -1, // Get all.
+				'orderby'   => 'ID',
+				'order'     => 'ASC',
+				'return'    => 'ids',
+				'meta_query' => array(
+					'relation' => 'OR',
+					array(
+						'key'     => '_sublium_plans_migrated',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'     => '_sublium_plans_migrated',
+						'value'   => 'yes',
+						'compare' => '!=',
+					),
+				),
 			)
 		);
 
@@ -153,14 +194,27 @@ class Products_Processor {
 			$product_ids = array_merge( $product_ids, array_map( 'absint', $native_products ) );
 		}
 
-		// If we have WCS_ATT products and haven't processed them yet, include them.
-		if ( class_exists( '\WCS_ATT' ) && 0 === $offset ) {
+		// Get WCS_ATT products if plugin is active.
+		if ( class_exists( '\WCS_ATT' ) ) {
 			// Get all published products to check for WCS_ATT schemes.
+			// Exclude products that already have migration meta.
 			$all_products = wc_get_products(
 				array(
-					'status' => 'publish',
-					'limit'  => -1, // Get all products to check for WCS_ATT meta.
-					'return' => 'ids',
+					'status'     => 'publish',
+					'limit'      => -1, // Get all products to check for WCS_ATT meta.
+					'return'     => 'ids',
+					'meta_query' => array(
+						'relation' => 'OR',
+						array(
+							'key'     => '_sublium_plans_migrated',
+							'compare' => 'NOT EXISTS',
+						),
+						array(
+							'key'     => '_sublium_plans_migrated',
+							'value'   => 'yes',
+							'compare' => '!=',
+						),
+					),
 				)
 			);
 
@@ -190,10 +244,49 @@ class Products_Processor {
 			$product_ids = array_merge( $product_ids, $wcsatt_ids );
 		}
 
-		// Remove duplicates and ensure unique IDs.
-		$final_ids = array_unique( array_map( 'absint', $product_ids ) );
+		// Remove duplicates and ensure unique IDs, then sort.
+		$all_ids = array_values( array_unique( array_map( 'absint', $product_ids ) ) );
+		sort( $all_ids );
 
-		return $final_ids;
+		// Debug logging.
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: Found %d total products to migrate (native: %d, WCS_ATT: %d)', count( $all_ids ), count( $native_products ?? array() ), count( $wcsatt_ids ?? array() ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		// Cache in state for persistence across batch runs.
+		$current_state = $state->get_state();
+		$current_state['products_migration']['all_product_ids'] = $all_ids;
+		$state->update_state( $current_state );
+
+		return $all_ids;
+	}
+
+	/**
+	 * Get products batch.
+	 *
+	 * @param int $offset Offset.
+	 * @param int $limit Limit.
+	 * @return array Product IDs.
+	 */
+	private function get_products_batch( $offset, $limit ) {
+		// Get all product IDs (cached).
+		$all_ids = $this->get_all_product_ids();
+
+		if ( empty( $all_ids ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: No products found at offset %d', $offset ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return array();
+		}
+
+		// Return paginated slice.
+		$batch = array_slice( $all_ids, $offset, $limit );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: get_products_batch() - offset=%d, limit=%d, total=%d, returning=%d products', $offset, $limit, count( $all_ids ), count( $batch ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		return $batch;
 	}
 
 	/**
@@ -208,16 +301,37 @@ class Products_Processor {
 			return false;
 		}
 
+		// Check if product already has plans migrated (meta check to prevent duplicates).
+		$migrated_meta = $product->get_meta( '_sublium_plans_migrated', true );
+		if ( ! empty( $migrated_meta ) && 'yes' === $migrated_meta ) {
+			// Product already migrated - check if plans still exist.
+			if ( $this->has_existing_plans( $product_id ) ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Product %d already migrated, skipping', $product_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+				return false; // Already migrated, skip.
+			}
+			// Plans were deleted, allow re-migration.
+		}
+
 		// Check if product is variable type.
 		$is_variable = $product->is_type( 'variable' ) || $product->is_type( 'variable-subscription' );
 
 		// For variable products, process each variation separately.
 		if ( $is_variable ) {
-			return $this->migrate_variable_product( $product_id );
+			$result = $this->migrate_variable_product( $product_id );
+		} else {
+			// For simple products, process normally.
+			$result = $this->migrate_simple_product( $product_id );
 		}
 
-		// For simple products, process normally.
-		return $this->migrate_simple_product( $product_id );
+		// Mark product as migrated if plans were created successfully.
+		if ( $result && $result > 0 ) {
+			$product->update_meta_data( '_sublium_plans_migrated', 'yes' );
+			$product->save();
+		}
+
+		return $result;
 	}
 
 	/**
@@ -308,10 +422,14 @@ class Products_Processor {
 		// Determine plan type based on virtual status (use parent product).
 		$plan_type = $this->determine_plan_type( $product );
 
-		// Create plan group (one group per variable product).
-		$plan_group_id = $this->create_plan_group( $product, $plan_type );
+		// Check if plan group already exists for this product.
+		$plan_group_id = $this->get_existing_plan_group( $product_id, $plan_type );
 		if ( ! $plan_group_id ) {
-			return false;
+			// Create plan group (one group per variable product).
+			$plan_group_id = $this->create_plan_group( $product, $plan_type );
+			if ( ! $plan_group_id ) {
+				return false;
+			}
 		}
 
 		// Step 1: Collect all unique schemes from the variable product.
@@ -828,6 +946,93 @@ class Products_Processor {
 				isset( $plan['billing_interval'] ) && absint( $plan['billing_interval'] ) === $interval &&
 				isset( $plan['free_trial'] ) && absint( $plan['free_trial'] ) === $trial_days ) {
 				return absint( $plan_id );
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if product has existing plans.
+	 *
+	 * @param int $product_id Product ID.
+	 * @return bool True if plans exist.
+	 */
+	private function has_existing_plans( $product_id ) {
+		if ( ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) ) {
+			return false;
+		}
+
+		$plan_relations = new \Sublium_WCS\Includes\database\PlanRelations();
+		$relations      = $plan_relations->read(
+			array(
+				'oid'    => absint( $product_id ),
+				'type'   => 1, // Specific product.
+				'status' => 1, // Active.
+			)
+		);
+
+		return ! empty( $relations ) && is_array( $relations );
+	}
+
+	/**
+	 * Get existing plan group for product.
+	 *
+	 * @param int $product_id Product ID.
+	 * @param int $plan_type Plan type.
+	 * @return int|false Plan group ID or false.
+	 */
+	private function get_existing_plan_group( $product_id, $plan_type ) {
+		if ( ! class_exists( '\Sublium_WCS\Includes\database\GroupPlans' ) || ! class_exists( '\Sublium_WCS\Includes\database\PlanRelations' ) ) {
+			return false;
+		}
+
+		// Find plan relations for this product.
+		$plan_relations = new \Sublium_WCS\Includes\database\PlanRelations();
+		$relations      = $plan_relations->read(
+			array(
+				'oid'    => absint( $product_id ),
+				'vid'    => 0, // Check at product level.
+				'type'   => 1, // Specific product.
+				'status' => 1, // Active.
+			)
+		);
+
+		if ( empty( $relations ) || ! is_array( $relations ) ) {
+			return false;
+		}
+
+		// Get plan IDs from relations.
+		$plan_ids = array();
+		foreach ( $relations as $relation ) {
+			if ( isset( $relation['plan_id'] ) ) {
+				$plan_ids[] = absint( $relation['plan_id'] );
+			}
+		}
+
+		if ( empty( $plan_ids ) ) {
+			return false;
+		}
+
+		// Get plan group ID from first plan.
+		$plan_db = new \Sublium_WCS\Includes\database\Plan();
+		$plan_data = $plan_db->read( array( 'id' => $plan_ids[0] ) );
+
+		if ( empty( $plan_data ) || ! is_array( $plan_data ) || ! isset( $plan_data[0] ) ) {
+			return false;
+		}
+
+		$plan = $plan_data[0];
+		if ( isset( $plan['plan_group_id'] ) && absint( $plan['plan_group_id'] ) > 0 ) {
+			// Verify plan group exists and matches plan type.
+			$group_db = new \Sublium_WCS\Includes\database\GroupPlans();
+			$group_data = $group_db->read( array( 'id' => absint( $plan['plan_group_id'] ) ) );
+
+			if ( ! empty( $group_data ) && is_array( $group_data ) && isset( $group_data[0] ) ) {
+				$group = $group_data[0];
+				if ( isset( $group['type'] ) && absint( $group['type'] ) === absint( $plan_type ) ) {
+					return absint( $plan['plan_group_id'] );
+				}
 			}
 		}
 

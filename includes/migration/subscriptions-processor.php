@@ -199,14 +199,22 @@ class Subscriptions_Processor {
 			return false;
 		}
 
-		// Check if subscription already migrated.
+		// Check if subscription already migrated (meta check to prevent duplicates).
 		$existing_sublium_id = $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true );
 		if ( ! empty( $existing_sublium_id ) ) {
-			$sublium_subscription = sublium_get_subscription($existing_sublium_id);
-			if($sublium_subscription->exists){
+			// Verify the Sublium subscription still exists.
+			if ( function_exists( 'sublium_get_subscription' ) ) {
+				$sublium_subscription = sublium_get_subscription( $existing_sublium_id );
+				if ( $sublium_subscription && $sublium_subscription->exists ) {
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Subscription %d already migrated (Sublium ID: %d), skipping', $subscription_id, $existing_sublium_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
+					return absint( $existing_sublium_id );
+				}
+			} else {
+				// If function doesn't exist, assume it's migrated to avoid duplicates.
 				return absint( $existing_sublium_id );
 			}
-
 		}
 
 		// Extract subscription data from WCS subscription.
@@ -255,6 +263,8 @@ class Subscriptions_Processor {
 
 		// Link WCS subscription to Sublium subscription.
 		$wcs_subscription->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
+		// Mark subscription as migrated.
+		$wcs_subscription->update_meta_data( '_sublium_subscription_migrated', 'yes' );
 		$wcs_subscription->save();
 
 		// Link parent order and renewal orders to Sublium subscription using direct database query.

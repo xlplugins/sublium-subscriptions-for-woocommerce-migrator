@@ -130,11 +130,14 @@ class Scheduler {
 		$state->update_state( $current_state );
 		$state->set_status( 'products_migrating' );
 
-		// Process first batch immediately (synchronously) for testing, then schedule subsequent batches.
+		// Ensure status is persisted before scheduling batch (clear any caches).
+		wp_cache_delete( \WCS_Sublium_Migrator\Migration\State::STATE_OPTION_NAME, 'options' );
+
+		// Schedule first batch to run asynchronously (not synchronously to avoid race condition with frontend status check).
 		$offset = absint( $current_state['products_migration']['processed_products'] ?? 0 );
 
-		// Process first batch immediately.
-		$this->process_products_batch( $offset );
+		// Schedule first batch instead of processing immediately to ensure status is set before processing starts.
+		$this->schedule_products_batch( $offset );
 
 		return array(
 			'success' => true,
@@ -269,16 +272,67 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_products_batch( $offset = 0 ) {
+		// Get total products BEFORE processing to check bounds.
+		$state = new State();
+		$current_state = $state->get_state();
+		$all_product_ids = isset( $current_state['products_migration']['all_product_ids'] ) && is_array( $current_state['products_migration']['all_product_ids'] )
+			? $current_state['products_migration']['all_product_ids']
+			: array();
+		$total_products_from_cache = count( $all_product_ids );
+		$total_products = absint( $current_state['products_migration']['total_products'] ?? 0 );
+		$actual_total = max( $total_products, $total_products_from_cache );
+
+		// If offset already exceeds total, don't process - migration is complete.
+		if ( $actual_total > 0 && $offset >= $actual_total ) {
+			$state->set_status( 'idle' );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Skipping batch at offset=%d (exceeds total=%d), setting status to idle', $offset, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return;
+		}
+
 		$processor = new Products_Processor();
 		$result = $processor->process_batch( $offset );
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
 			$this->schedule_products_batch( $result['next_offset'] );
+			// Ensure status remains 'products_migrating' while processing.
+			$state->set_status( 'products_migrating' );
 		} else {
-			// Products migration complete.
-			$state = new State();
-			$state->set_status( 'idle' );
+			// Batch returned no more items - check if migration is complete.
+			if ( $actual_total > 0 && $processed_products >= $actual_total ) {
+				// Processed count equals or exceeds total - migration complete.
+				$state->set_status( 'idle' );
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Migration complete - processed=%d, total=%d', $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+			} elseif ( $actual_total > 0 && $processed_products < $actual_total ) {
+				// Not complete yet - check if next offset would exceed total.
+				$reflection = new \ReflectionClass( $processor );
+				$batch_size_property = $reflection->getProperty( 'batch_size' );
+				$batch_size_property->setAccessible( true );
+				$batch_size = $batch_size_property->getValue( $processor );
+				$next_offset = $offset + $batch_size;
+
+				if ( $next_offset < $actual_total ) {
+					// Schedule next batch if we haven't exceeded total.
+					$state->set_status( 'products_migrating' );
+					$this->schedule_products_batch( $next_offset );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Scheduling next batch at offset=%d (processed=%d, total=%d)', $next_offset, $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
+				} else {
+					// Next offset would exceed total - migration complete.
+					$state->set_status( 'idle' );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Next offset=%d would exceed total=%d, setting status to idle', $next_offset, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
+				}
+			} else {
+				// No products to process or already complete.
+				$state->set_status( 'idle' );
+			}
 		}
 	}
 

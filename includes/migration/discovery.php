@@ -403,7 +403,7 @@ class Discovery {
 		$wcsatt_count = 0;
 		$wcsatt_active = false;
 
-		// Check if WCS_ATT plugin is active.
+		// Check if WCS_ATT plugin is active - only count WCS_ATT products if plugin is active.
 		if ( class_exists( '\WCS_ATT' ) ) {
 			$wcsatt_active = true;
 		} else {
@@ -420,27 +420,36 @@ class Discovery {
 			}
 		}
 
-		// Get all published products to check for WCS_ATT meta.
-		$all_products = wc_get_products(
-			array(
-				'status' => 'publish',
-				'limit'  => -1,
-				'return' => 'ids',
-			)
-		);
+		// Only count WCS_ATT products if plugin is actually active (same logic as products-processor.php).
+		if ( $wcsatt_active ) {
+			// Get all published products to check for WCS_ATT meta.
+			$all_products = wc_get_products(
+				array(
+					'status' => 'publish',
+					'limit'  => -1,
+					'return' => 'ids',
+				)
+			);
 
-		if ( is_array( $all_products ) ) {
-			foreach ( $all_products as $product_id ) {
-				$product = wc_get_product( $product_id );
-				if ( ! $product ) {
-					continue;
-				}
+			if ( is_array( $all_products ) ) {
+				foreach ( $all_products as $product_id ) {
+					$product = wc_get_product( $product_id );
+					if ( ! $product ) {
+						continue;
+					}
 
-				// Check for WCS_ATT schemes meta.
-				$schemes = $product->get_meta( '_wcsatt_schemes', true );
-				if ( ! empty( $schemes ) && is_array( $schemes ) && ! empty( $schemes ) ) {
-					$wcsatt_count++;
-					$wcsatt_active = true;
+					// Check for WCS_ATT schemes meta.
+					$schemes = $product->get_meta( '_wcsatt_schemes', true );
+					if ( ! empty( $schemes ) ) {
+						// Handle serialized data.
+						if ( is_string( $schemes ) ) {
+							$schemes = maybe_unserialize( $schemes );
+						}
+
+						if ( is_array( $schemes ) && ! empty( $schemes ) ) {
+							$wcsatt_count++;
+						}
+					}
 				}
 			}
 		}

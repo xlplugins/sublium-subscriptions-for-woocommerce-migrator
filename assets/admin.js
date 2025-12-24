@@ -92,7 +92,16 @@
 
 				// Only auto-set step to 5 if migration is completed AND we're not manually navigating
 				// Preserve the current step if user is navigating manually
-				if (statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused') {
+				// Check if migration is in progress or incomplete
+				const productsTotal = parseInt((statusData.products_migration || {}).total_products || 0, 10);
+				const productsProcessed = parseInt((statusData.products_migration || {}).processed_products || 0, 10);
+				const subscriptionsTotal = parseInt((statusData.subscriptions_migration || {}).total_subscriptions || 0, 10);
+				const subscriptionsProcessed = parseInt((statusData.subscriptions_migration || {}).processed_subscriptions || 0, 10);
+				const isProductsIncomplete = productsTotal > 0 && productsProcessed < productsTotal;
+				const isSubscriptionsIncomplete = subscriptionsTotal > 0 && subscriptionsProcessed < subscriptionsTotal;
+				const isInProgress = statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused' || isProductsIncomplete || isSubscriptionsIncomplete;
+
+				if (isInProgress) {
 					WCSMigrator.renderProgress(statusData);
 					WCSMigrator.startStatusPolling();
 				} else if (statusData.status === 'completed' && !WCSMigrator.isNavigating && WCSMigrator.currentStep < 5) {
@@ -724,7 +733,16 @@
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
 				},
 				success: function(response) {
-					if (response.status === 'products_migrating' || response.status === 'subscriptions_migrating' || response.status === 'paused') {
+					// Check if migration is in progress or incomplete
+					const productsTotal = parseInt((response.products_migration || {}).total_products || 0, 10);
+					const productsProcessed = parseInt((response.products_migration || {}).processed_products || 0, 10);
+					const subscriptionsTotal = parseInt((response.subscriptions_migration || {}).total_subscriptions || 0, 10);
+					const subscriptionsProcessed = parseInt((response.subscriptions_migration || {}).processed_subscriptions || 0, 10);
+					const isProductsIncomplete = productsTotal > 0 && productsProcessed < productsTotal;
+					const isSubscriptionsIncomplete = subscriptionsTotal > 0 && subscriptionsProcessed < subscriptionsTotal;
+					const isInProgress = response.status === 'products_migrating' || response.status === 'subscriptions_migrating' || response.status === 'paused' || isProductsIncomplete || isSubscriptionsIncomplete;
+
+					if (isInProgress) {
 						WCSMigrator.renderProgress(response);
 						WCSMigrator.startStatusPolling();
 					} else if (response.status === 'completed') {
@@ -770,35 +788,39 @@
 			const productsTotal = parseInt(productsMigration.total_products || 0, 10);
 			const productsProcessed = parseInt(productsMigration.processed_products || 0, 10);
 			const productsProgress = productsTotal > 0 ? Math.min(100, (productsProcessed / productsTotal) * 100) : 0;
+			// Show products progress only if on step 3 (Migrate Products) AND (status is 'products_migrating' OR migration is incomplete)
+			const showProductsProgress = (this.currentStep === 3) && (isProductsActive || (productsTotal > 0 && productsProcessed < productsTotal));
 
 			const subscriptionsTotal = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
 			const subscriptionsProcessed = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
 			const subscriptionsProgress = subscriptionsTotal > 0 ? Math.min(100, (subscriptionsProcessed / subscriptionsTotal) * 100) : 0;
+			// Show subscriptions progress only if on step 2 (Migrate Subscriptions) AND (status is 'subscriptions_migrating' OR migration is incomplete)
+			const showSubscriptionsProgress = (this.currentStep === 2) && (isSubscriptionsActive || (subscriptionsTotal > 0 && subscriptionsProcessed < subscriptionsTotal));
 
 			return `
-				${(productsTotal > 0 || isProductsActive) ? `
+				${showProductsProgress ? `
 					<div class="wcs-migrator-progress">
 						<div class="wcs-migrator-progress-label">
-							Products Migration: ${productsProcessed} / ${productsTotal}
+							Products Migration: ${productsProcessed} / ${productsTotal || '...'}
 							${productsMigration.created_plans ? ` (${productsMigration.created_plans} plans created)` : ''}
 						</div>
 						<div class="wcs-migrator-progress-bar">
 							<div class="wcs-migrator-progress-fill" style="width: ${productsProgress}%">
-								${Math.round(productsProgress)}%
+								${productsTotal > 0 ? Math.round(productsProgress) + '%' : 'Starting...'}
 							</div>
 						</div>
 					</div>
 				` : ''}
 
-				${(subscriptionsTotal > 0 || isSubscriptionsActive) ? `
+				${showSubscriptionsProgress ? `
 					<div class="wcs-migrator-progress">
 						<div class="wcs-migrator-progress-label">
-							Subscriptions Migration: ${subscriptionsProcessed} / ${subscriptionsTotal}
+							Subscriptions Migration: ${subscriptionsProcessed} / ${subscriptionsTotal || '...'}
 							${subscriptionsMigration.created_subscriptions ? ` (${subscriptionsMigration.created_subscriptions} created)` : ''}
 						</div>
 						<div class="wcs-migrator-progress-bar">
 							<div class="wcs-migrator-progress-fill" style="width: ${subscriptionsProgress}%">
-								${Math.round(subscriptionsProgress)}%
+								${subscriptionsTotal > 0 ? Math.round(subscriptionsProgress) + '%' : 'Starting...'}
 							</div>
 						</div>
 					</div>
@@ -855,8 +877,22 @@
 				},
 				success: function(response) {
 					if (response && response.success) {
-						// Refresh the wizard to show progress
-						WCSMigrator.loadFeasibility();
+						// Immediately show progress screen optimistically
+						const optimisticStatus = {
+							status: 'products_migrating',
+							products_migration: {
+								total_products: 0,
+								processed_products: 0,
+								created_plans: 0
+							}
+						};
+						WCSMigrator.renderProgress(optimisticStatus);
+						WCSMigrator.startStatusPolling();
+
+						// Then refresh with real status after a short delay
+						setTimeout(function() {
+							WCSMigrator.loadFeasibility();
+						}, 500);
 					} else {
 						const errorMsg = (response && response.message) ? response.message : 'Failed to start products migration';
 						WCSMigrator.showError(errorMsg);
@@ -931,8 +967,10 @@
 				},
 				success: function(response) {
 					if (response && response.success) {
-						// Refresh the wizard to show progress
-						WCSMigrator.loadFeasibility();
+						// Small delay to ensure backend has updated status, then refresh
+						setTimeout(function() {
+							WCSMigrator.loadFeasibility();
+						}, 500);
 					} else {
 						const errorMsg = (response && response.message) ? response.message : 'Failed to start subscriptions migration';
 						WCSMigrator.showError(errorMsg);

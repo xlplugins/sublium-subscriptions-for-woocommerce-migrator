@@ -265,6 +265,8 @@ class Migration_API {
 	 */
 	public function get_status( $request ) {
 		$state = new \WCS_Sublium_Migrator\Migration\State();
+		// Clear cache to ensure fresh status data.
+		wp_cache_delete( \WCS_Sublium_Migrator\Migration\State::STATE_OPTION_NAME, 'options' );
 		$status = $state->get_state();
 
 		// Calculate progress percentages.
