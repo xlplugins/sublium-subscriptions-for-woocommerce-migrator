@@ -331,7 +331,7 @@ class Migration_API {
 	 * @return \WP_REST_Response
 	 */
 	public function reset_migration( $request ) {
-		$state = \WCS_Sublium_Migrator\Migration\State::get_instance();
+		$state = new \WCS_Sublium_Migrator\Migration\State();
 		$state->reset_state();
 
 		return new \WP_REST_Response(

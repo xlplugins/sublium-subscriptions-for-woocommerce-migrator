@@ -52,10 +52,14 @@
 					}
 				}),
 				$.ajax({
-					url: (typeof rest_url !== 'undefined' ? rest_url('sublium-admin/v1/integrations/') : wcsSubliumMigrator.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-admin/v1/integrations/')),
+					url: WCSMigrator.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-admin/v1/integrations'),
 					method: 'GET',
 					beforeSend: function(xhr) {
 						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+					},
+					error: function() {
+						// If integrations endpoint fails (e.g., Sublium Pro not active), return empty array
+						return { success: false, data: { items: [] } };
 					}
 				}).fail(function() {
 					// If integrations endpoint fails, continue without integrations
@@ -64,10 +68,18 @@
 			).done(function(discoveryResponse, statusResponse, integrationsResponse) {
 				const discoveryData = discoveryResponse[0];
 				const statusData = statusResponse[0];
-				const integrationsData = integrationsResponse && integrationsResponse[0] ? integrationsResponse[0] : { success: false, data: { items: [] } };
+				
+				// Handle integrations response - it might fail if Sublium Pro is not active
+				let integrationsData = { success: false, data: { items: [] } };
+				if (integrationsResponse && integrationsResponse[0]) {
+					const response = integrationsResponse[0];
+					if (response.success !== false && response.data && response.data.items) {
+						integrationsData = response;
+					}
+				}
 
 				WCSMigrator.discoveryData = discoveryData;
-				WCSMigrator.integrationsData = integrationsData.success ? integrationsData.data.items : [];
+				WCSMigrator.integrationsData = integrationsData.success && integrationsData.data ? integrationsData.data.items : [];
 
 				if (statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused') {
 					WCSMigrator.renderProgress(statusData);
@@ -367,8 +379,8 @@
 					${integrations.length > 0 ? `
 						<div class="wcs-wizard-integrations">
 							<p class="wcs-wizard-summary">
-								<strong>${integrations.length}</strong> integrations available, 
-								<strong>${installedIntegrations.length}</strong> installed, 
+								<strong>${integrations.length}</strong> integrations available,
+								<strong>${installedIntegrations.length}</strong> installed,
 								<strong>${connectedIntegrations.length}</strong> connected
 							</p>
 							<div class="wcs-wizard-integrations-list">
@@ -398,7 +410,7 @@
 		renderStep5GoLive: function(data, statusData) {
 			const subscriptionsMigration = statusData.subscriptions_migration || {};
 			const productsMigration = statusData.products_migration || {};
-			const isMigrationComplete = subscriptionsMigration.processed_subscriptions >= subscriptionsMigration.total_subscriptions && 
+			const isMigrationComplete = subscriptionsMigration.processed_subscriptions >= subscriptionsMigration.total_subscriptions &&
 										productsMigration.processed_products >= productsMigration.total_products &&
 										subscriptionsMigration.total_subscriptions > 0 && productsMigration.total_products > 0;
 
@@ -505,7 +517,7 @@
 			}
 
 			if (this.currentStep < this.totalSteps) {
-				const canProceed = (this.currentStep === 1) || 
+				const canProceed = (this.currentStep === 1) ||
 								   (this.currentStep === 2 && (isSubscriptionsCompleted || isSubscriptionsInProgress || isPaused)) ||
 								   (this.currentStep === 3 && (isProductsCompleted || isProductsInProgress || isPaused)) ||
 								   (this.currentStep === 4);
@@ -839,7 +851,7 @@
 		renderProductsList: function(products) {
 			const tbody = $('.wcs-migrator-products-tbody');
 			tbody.empty();
-			
+
 			if (products.length === 0) {
 				tbody.append('<tr><td colspan="4">No subscription products found.</td></tr>');
 				return;
