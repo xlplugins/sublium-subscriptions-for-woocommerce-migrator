@@ -9,18 +9,21 @@
 		currentStep: 1,
 		totalSteps: 5,
 		integrationsData: null,
+		isNavigating: false, // Flag to prevent auto-step changes during manual navigation
 
 		init: function() {
 			this.apiUrl = wcsSubliumMigrator.apiUrl;
 			this.nonce = wcsSubliumMigrator.nonce;
 
-			this.loadFeasibility();
+			// Bind events first so they're ready when content loads
 			this.bindEvents();
+			this.loadFeasibility();
 		},
 
 		bindEvents: function() {
-			$(document).on('click', '.wcs-wizard-next', this.handleNextStep.bind(this));
-			$(document).on('click', '.wcs-wizard-prev', this.handlePrevStep.bind(this));
+			// Use event delegation - unbind first to prevent duplicate handlers
+			$(document).off('click', '.wcs-wizard-next').on('click', '.wcs-wizard-next', this.handleNextStep.bind(this));
+			$(document).off('click', '.wcs-wizard-prev').on('click', '.wcs-wizard-prev', this.handlePrevStep.bind(this));
 			$(document).on('click', '.wcs-wizard-step-link', this.handleStepClick.bind(this));
 			$(document).on('click', '.wcs-migrator-start-subscriptions', this.handleStartSubscriptionsMigration.bind(this));
 			$(document).on('click', '.wcs-migrator-start-products', this.handleStartProductsMigration.bind(this));
@@ -31,12 +34,13 @@
 			$(document).on('click', '.wcs-migrator-load-products', this.handleLoadProducts.bind(this));
 			$(document).on('click', '.wcs-migrator-convert-product', this.handleConvertProduct.bind(this));
 			$(document).on('click', '.wcs-wizard-deactivate-wcs', this.handleDeactivateWCS.bind(this));
+			$(document).on('click', '.wcs-wizard-deactivate-wcsatt', this.handleDeactivateWCSATT.bind(this));
 			$(document).on('click', '.wcs-wizard-convert-all-products', this.handleConvertAllProducts.bind(this));
 		},
 
 		loadFeasibility: function() {
 			const self = this;
-			const integrationsUrl = this.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-admin/v1/integrations');
+			const integrationsUrl = this.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-wcs-admin/v1/integrations?_locale=user');
 
 			// Create a promise that always resolves, even on 404
 			const integrationsPromise = $.ajax({
@@ -86,15 +90,22 @@
 				WCSMigrator.discoveryData = discoveryData;
 				WCSMigrator.integrationsData = integrationsData.success && integrationsData.data ? integrationsData.data.items : [];
 
+				// Only auto-set step to 5 if migration is completed AND we're not manually navigating
+				// Preserve the current step if user is navigating manually
 				if (statusData.status === 'products_migrating' || statusData.status === 'subscriptions_migrating' || statusData.status === 'paused') {
 					WCSMigrator.renderProgress(statusData);
 					WCSMigrator.startStatusPolling();
-				} else if (statusData.status === 'completed') {
+				} else if (statusData.status === 'completed' && !WCSMigrator.isNavigating && WCSMigrator.currentStep < 5) {
+					// Only auto-navigate to step 5 if not manually navigating and not already there
 					WCSMigrator.currentStep = 5;
 					WCSMigrator.renderWizard(discoveryData, statusData);
 				} else {
+					// Render with current step (preserves manual navigation)
 					WCSMigrator.renderWizard(discoveryData, statusData);
 				}
+
+				// Reset navigation flag after rendering
+				WCSMigrator.isNavigating = false;
 			}).fail(function() {
 				WCSMigrator.showError('Failed to load migration data');
 			});
@@ -183,7 +194,7 @@
 						</div>
 						${data.products.wcsatt_active ? `
 						<div class="wcs-migrator-stat-card">
-							<h3>WCS_ATT Products</h3>
+							<h3>All product subscription</h3>
 							<p class="stat-value">${data.products.wcsatt_count}</p>
 						</div>
 						` : ''}
@@ -330,7 +341,7 @@
 						</div>
 						${data.products.wcsatt_active ? `
 						<div class="wcs-migrator-stat-card">
-							<h3>WCS_ATT Products</h3>
+							<h3>All product subscription</h3>
 							<p class="stat-value">${data.products.wcsatt_count}</p>
 						</div>
 						` : ''}
@@ -453,7 +464,15 @@
 						</div>
 
 						<div class="wcs-wizard-golive-step">
-							<h3>2. Convert Subscription Products</h3>
+							<h3>2. Deactivate All Products for Subscriptions</h3>
+							<p>Deactivate the All Products for Subscriptions plugin to prevent conflicts with Sublium.</p>
+							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-deactivate-wcsatt" ${!isMigrationComplete || isMigrationActive ? 'disabled' : ''}>
+								Deactivate All Products for Subscriptions
+							</button>
+						</div>
+
+						<div class="wcs-wizard-golive-step">
+							<h3>3. Convert Subscription Products</h3>
 							<p>Convert WCS subscription products to regular WooCommerce products (only products with no active subscriptions).</p>
 							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-load-products" ${!isMigrationComplete || isMigrationActive ? 'disabled' : ''}>
 								Load Products
@@ -494,7 +513,7 @@
 			// Allow subscriptions migration to start independently (subscriptions use plan_data directly)
 			// Disable if any migration is active
 			if (this.currentStep === 2 && !isSubscriptionsCompleted && !isSubscriptionsInProgress && !isPaused) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${isMigrationActive ? 'disabled' : ''}>
+				buttons += `<button type="button" class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${isMigrationActive ? 'disabled' : ''}>
 					Start Subscriptions Migration
 				</button>`;
 			}
@@ -521,9 +540,9 @@
 				</button>`;
 			}
 
-			// Navigation buttons - disable during active migrations
+			// Navigation buttons - allow Previous navigation (going back doesn't interfere with migrations)
 			if (this.currentStep > 1) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-prev" ${isMigrationActive ? 'disabled' : ''}>
+				buttons += `<button type="button" class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-prev">
 					Previous
 				</button>`;
 			}
@@ -545,27 +564,66 @@
 
 		handleNextStep: function(e) {
 			e.preventDefault();
+			e.stopPropagation();
 			const $target = $(e.currentTarget);
 			// Skip if button is disabled
-			if ($target.prop('disabled')) {
+			if ($target.prop('disabled') || $target.hasClass('disabled')) {
 				return;
 			}
 			if (this.currentStep < this.totalSteps) {
+				// Set navigation flag to prevent auto-step changes
+				this.isNavigating = true;
 				this.currentStep++;
-				this.loadFeasibility();
+				// Force re-render immediately to show the new step
+				if (this.discoveryData) {
+					// If we have cached data, render immediately
+					const self = this;
+					$.ajax({
+						url: this.apiUrl + 'status',
+						method: 'GET',
+						beforeSend: function(xhr) {
+							xhr.setRequestHeader('X-WP-Nonce', self.nonce);
+						},
+						success: function(statusData) {
+							self.renderWizard(self.discoveryData, statusData);
+							self.isNavigating = false;
+						}
+					});
+				} else {
+					// Otherwise load fresh data
+					this.loadFeasibility();
+				}
 			}
 		},
 
 		handlePrevStep: function(e) {
 			e.preventDefault();
+			e.stopPropagation();
 			const $target = $(e.currentTarget);
 			// Skip if button is disabled
-			if ($target.prop('disabled')) {
+			if ($target.prop('disabled') || $target.hasClass('disabled')) {
 				return;
 			}
 			if (this.currentStep > 1) {
-				this.currentStep--;
-				this.loadFeasibility();
+				const newStep = this.currentStep - 1;
+				this.currentStep = newStep;
+				// Force re-render immediately to show the new step
+				if (this.discoveryData) {
+					// If we have cached data, render immediately
+					$.ajax({
+						url: this.apiUrl + 'status',
+						method: 'GET',
+						beforeSend: (xhr) => {
+							xhr.setRequestHeader('X-WP-Nonce', this.nonce);
+						},
+						success: (statusData) => {
+							this.renderWizard(this.discoveryData, statusData);
+						}
+					});
+				} else {
+					// Otherwise load fresh data
+					this.loadFeasibility();
+				}
 			}
 		},
 
@@ -580,11 +638,74 @@
 
 		handleDeactivateWCS: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			if (!confirm('Are you sure you want to deactivate WooCommerce Subscriptions? This action cannot be undone easily.')) {
 				return;
 			}
-			// This would need a custom endpoint to deactivate the plugin
-			alert('Plugin deactivation feature needs to be implemented via WordPress admin or manually.');
+
+			const self = this;
+			$.ajax({
+				url: this.apiUrl + 'plugins/deactivate-wcs',
+				method: 'POST',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function(response) {
+					if (response && response.success) {
+						alert(response.message || 'WooCommerce Subscriptions plugin deactivated successfully');
+						$target.prop('disabled', true).text('Deactivated');
+					} else {
+						WCSMigrator.showError(response.message || 'Failed to deactivate WooCommerce Subscriptions plugin');
+					}
+				},
+				error: function(xhr) {
+					let errorMsg = 'Failed to deactivate WooCommerce Subscriptions plugin';
+					if (xhr.responseJSON && xhr.responseJSON.message) {
+						errorMsg = xhr.responseJSON.message;
+					}
+					WCSMigrator.showError(errorMsg);
+				}
+			});
+		},
+
+		handleDeactivateWCSATT: function(e) {
+			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
+			if (!confirm('Are you sure you want to deactivate All Products for Subscriptions? This action cannot be undone easily.')) {
+				return;
+			}
+
+			const self = this;
+			$.ajax({
+				url: this.apiUrl + 'plugins/deactivate-wcsatt',
+				method: 'POST',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+				},
+				success: function(response) {
+					if (response && response.success) {
+						alert(response.message || 'All Products for Subscriptions plugin deactivated successfully');
+						$target.prop('disabled', true).text('Deactivated');
+					} else {
+						WCSMigrator.showError(response.message || 'Failed to deactivate All Products for Subscriptions plugin');
+					}
+				},
+				error: function(xhr) {
+					let errorMsg = 'Failed to deactivate All Products for Subscriptions plugin';
+					if (xhr.responseJSON && xhr.responseJSON.message) {
+						errorMsg = xhr.responseJSON.message;
+					}
+					WCSMigrator.showError(errorMsg);
+				}
+			});
 		},
 
 		handleConvertAllProducts: function(e) {
@@ -640,18 +761,25 @@
 		},
 
 		renderProgressContent: function(data) {
-			const productsProgress = (data.progress && data.progress.products) ? data.progress.products : 0;
-			const subscriptionsProgress = (data.progress && data.progress.subscriptions) ? data.progress.subscriptions : 0;
 			const productsMigration = data.products_migration || {};
 			const subscriptionsMigration = data.subscriptions_migration || {};
 			const isProductsActive = data.status === 'products_migrating';
 			const isSubscriptionsActive = data.status === 'subscriptions_migrating';
 
+			// Calculate progress percentages from actual counts
+			const productsTotal = parseInt(productsMigration.total_products || 0, 10);
+			const productsProcessed = parseInt(productsMigration.processed_products || 0, 10);
+			const productsProgress = productsTotal > 0 ? Math.min(100, (productsProcessed / productsTotal) * 100) : 0;
+
+			const subscriptionsTotal = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
+			const subscriptionsProcessed = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
+			const subscriptionsProgress = subscriptionsTotal > 0 ? Math.min(100, (subscriptionsProcessed / subscriptionsTotal) * 100) : 0;
+
 			return `
-				${(productsMigration.total_products > 0 || isProductsActive) ? `
+				${(productsTotal > 0 || isProductsActive) ? `
 					<div class="wcs-migrator-progress">
 						<div class="wcs-migrator-progress-label">
-							Products Migration: ${productsMigration.processed_products || 0} / ${productsMigration.total_products || 0}
+							Products Migration: ${productsProcessed} / ${productsTotal}
 							${productsMigration.created_plans ? ` (${productsMigration.created_plans} plans created)` : ''}
 						</div>
 						<div class="wcs-migrator-progress-bar">
@@ -662,15 +790,15 @@
 					</div>
 				` : ''}
 
-				${(subscriptionsMigration.total_subscriptions > 0 || isSubscriptionsActive) ? `
+				${(subscriptionsTotal > 0 || isSubscriptionsActive) ? `
 					<div class="wcs-migrator-progress">
 						<div class="wcs-migrator-progress-label">
-							Subscriptions Migration: ${subscriptionsMigration.processed_subscriptions || 0} / ${subscriptionsMigration.total_subscriptions || 0}
+							Subscriptions Migration: ${subscriptionsProcessed} / ${subscriptionsTotal}
 							${subscriptionsMigration.created_subscriptions ? ` (${subscriptionsMigration.created_subscriptions} created)` : ''}
 						</div>
 						<div class="wcs-migrator-progress-bar">
-							<div class="wcs-migrator-progress-fill" style="width: ${Math.min(100, subscriptionsProgress)}%">
-								${Math.round(Math.min(100, subscriptionsProgress))}%
+							<div class="wcs-migrator-progress-fill" style="width: ${subscriptionsProgress}%">
+								${Math.round(subscriptionsProgress)}%
 							</div>
 						</div>
 					</div>
@@ -705,9 +833,10 @@
 
 		handleStartProductsMigration: function(e) {
 			e.preventDefault();
+			e.stopPropagation();
 			const $target = $(e.currentTarget);
 			// Skip if button is disabled
-			if ($target.prop('disabled')) {
+			if ($target.prop('disabled') || $target.hasClass('disabled')) {
 				return;
 			}
 			if (!confirm('Are you sure you want to start products migration? This will process all subscription products and create plans in the background.')) {
@@ -715,6 +844,9 @@
 			}
 
 			const self = this;
+			// Disable button immediately to prevent double-clicks
+			$target.prop('disabled', true);
+
 			$.ajax({
 				url: this.apiUrl + 'start-products',
 				method: 'POST',
@@ -723,10 +855,13 @@
 				},
 				success: function(response) {
 					if (response && response.success) {
-						WCSMigrator.checkMigrationStatus();
+						// Refresh the wizard to show progress
+						WCSMigrator.loadFeasibility();
 					} else {
 						const errorMsg = (response && response.message) ? response.message : 'Failed to start products migration';
 						WCSMigrator.showError(errorMsg);
+						// Re-enable button on error
+						$target.prop('disabled', false);
 					}
 				},
 				error: function(xhr, status, error) {
@@ -744,15 +879,18 @@
 						}
 					}
 					WCSMigrator.showError(errorMsg + ' (Status: ' + xhr.status + ')');
+					// Re-enable button on error
+					$target.prop('disabled', false);
 				}
 			});
 		},
 
 		handleStartSubscriptionsMigration: function(e) {
 			e.preventDefault();
+			e.stopPropagation();
 			const $target = $(e.currentTarget);
 			// Skip if button is disabled
-			if ($target.prop('disabled')) {
+			if ($target.prop('disabled') || $target.hasClass('disabled')) {
 				return;
 			}
 
@@ -781,6 +919,10 @@
 				return;
 			}
 
+			// Disable button immediately to prevent double-clicks
+			$target.prop('disabled', true);
+			const self = this;
+
 			$.ajax({
 				url: this.apiUrl + 'start-subscriptions',
 				method: 'POST',
@@ -788,14 +930,24 @@
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
 				},
 				success: function(response) {
-					if (response.success) {
-						WCSMigrator.checkMigrationStatus();
+					if (response && response.success) {
+						// Refresh the wizard to show progress
+						WCSMigrator.loadFeasibility();
 					} else {
-						WCSMigrator.showError(response.message);
+						const errorMsg = (response && response.message) ? response.message : 'Failed to start subscriptions migration';
+						WCSMigrator.showError(errorMsg);
+						// Re-enable button on error
+						$target.prop('disabled', false);
 					}
 				},
-				error: function() {
-					WCSMigrator.showError('Failed to start subscriptions migration');
+				error: function(xhr) {
+					let errorMsg = 'Failed to start subscriptions migration';
+					if (xhr.responseJSON && xhr.responseJSON.message) {
+						errorMsg = xhr.responseJSON.message;
+					}
+					WCSMigrator.showError(errorMsg);
+					// Re-enable button on error
+					$target.prop('disabled', false);
 				}
 			});
 		},

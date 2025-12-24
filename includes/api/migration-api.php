@@ -177,6 +177,28 @@ class Migration_API {
 				'permission_callback' => array( $this, 'check_permissions' ),
 			)
 		);
+
+		// Deactivate WooCommerce Subscriptions plugin endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/plugins/deactivate-wcs',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'deactivate_wcs_plugin' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
+
+		// Deactivate All Products for Subscriptions plugin endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/plugins/deactivate-wcsatt',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'deactivate_wcsatt_plugin' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
 	}
 
 	/**
@@ -439,6 +461,100 @@ class Migration_API {
 					$result['success'],
 					$result['failed']
 				),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Deactivate WooCommerce Subscriptions plugin.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function deactivate_wcs_plugin( $request ) {
+		if ( ! function_exists( 'deactivate_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugin_file = 'woocommerce-subscriptions/woocommerce-subscriptions.php';
+
+		// Check if plugin is active.
+		if ( ! is_plugin_active( $plugin_file ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'WooCommerce Subscriptions plugin is not active', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
+		// Check user capability.
+		if ( ! current_user_can( 'deactivate_plugin', $plugin_file ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'You do not have permission to deactivate this plugin', 'wcs-sublium-migrator' ),
+				),
+				403
+			);
+		}
+
+		// Deactivate the plugin.
+		deactivate_plugins( $plugin_file );
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'message' => __( 'WooCommerce Subscriptions plugin deactivated successfully', 'wcs-sublium-migrator' ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Deactivate All Products for Subscriptions plugin.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function deactivate_wcsatt_plugin( $request ) {
+		if ( ! function_exists( 'deactivate_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$plugin_file = 'woocommerce-all-products-for-subscriptions/woocommerce-all-products-for-subscriptions.php';
+
+		// Check if plugin is active.
+		if ( ! is_plugin_active( $plugin_file ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'All Products for Subscriptions plugin is not active', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
+		// Check user capability.
+		if ( ! current_user_can( 'deactivate_plugin', $plugin_file ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'You do not have permission to deactivate this plugin', 'wcs-sublium-migrator' ),
+				),
+				403
+			);
+		}
+
+		// Deactivate the plugin.
+		deactivate_plugins( $plugin_file );
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'message' => __( 'All Products for Subscriptions plugin deactivated successfully', 'wcs-sublium-migrator' ),
 			),
 			200
 		);
