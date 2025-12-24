@@ -73,6 +73,7 @@ class Scheduler {
 		}
 
 		// Check if products migration already completed.
+		// Only check if total_products > 0 (migration was actually started before).
 		$is_completed = false;
 		if ( isset( $current_state['products_migration']['processed_products'] ) &&
 			 isset( $current_state['products_migration']['total_products'] ) &&
@@ -164,8 +165,10 @@ class Scheduler {
 		}
 
 		// Check if subscriptions migration already completed.
+		// Only check if total_subscriptions > 0 (migration was actually started before).
 		if ( isset( $current_state['subscriptions_migration']['processed_subscriptions'] ) &&
 			 isset( $current_state['subscriptions_migration']['total_subscriptions'] ) &&
+			 absint( $current_state['subscriptions_migration']['total_subscriptions'] ) > 0 &&
 			 absint( $current_state['subscriptions_migration']['processed_subscriptions'] ) >= absint( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
 			return array(
 				'success' => false,
@@ -173,19 +176,7 @@ class Scheduler {
 			);
 		}
 
-		// Check if products migration is completed.
-		$products_completed = false;
-		if ( isset( $current_state['products_migration']['processed_products'] ) &&
-			 isset( $current_state['products_migration']['total_products'] ) ) {
-			$products_completed = absint( $current_state['products_migration']['processed_products'] ) >= absint( $current_state['products_migration']['total_products'] );
-		}
-
-		if ( ! $products_completed && absint( $current_state['products_migration']['total_products'] ?? 0 ) > 0 ) {
-			return array(
-				'success' => false,
-				'message' => __( 'Please complete products migration first', 'wcs-sublium-migrator' ),
-			);
-		}
+		// Note: Products migration check removed - subscriptions migration can run independently.
 
 		// Run discovery if not already done.
 		if ( empty( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
@@ -374,8 +365,10 @@ class Scheduler {
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_products_batch' );
 		wp_clear_scheduled_hook( 'wcs_sublium_migrate_subscriptions_batch' );
 
-
+		// Reset state (but don't clear scheduled hooks again - already done above).
 		$state = new State();
-		$state->reset_state();
+		// Just delete the option, don't call reset_state() to avoid double clearing hooks.
+		delete_option( 'wcs_sublium_migration_state' );
+		wp_cache_delete( 'wcs_sublium_migration_state', 'options' );
 	}
 }

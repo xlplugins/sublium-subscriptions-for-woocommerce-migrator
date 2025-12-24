@@ -142,7 +142,12 @@
 	background: #dcdcde;
 }
 
-.wcs-migrator-button:disabled {
+.wcs-migrator-button:disabled,
+.wcs-migrator-button[disabled] {
+	opacity: 0.6;
+	cursor: not-allowed;
+	pointer-events: none;
+}
 	opacity: 0.6;
 	cursor: not-allowed;
 }
@@ -290,6 +295,15 @@
 
 .wcs-wizard-step-link:hover {
 	color: #2271b1;
+}
+
+.wcs-wizard-step-disabled {
+	cursor: default !important;
+	pointer-events: none;
+}
+
+.wcs-wizard-step-disabled:hover {
+	color: #666 !important;
 }
 
 .wcs-wizard-step-number {

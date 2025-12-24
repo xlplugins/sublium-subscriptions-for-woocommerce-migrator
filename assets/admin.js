@@ -36,46 +36,51 @@
 
 		loadFeasibility: function() {
 			const self = this;
+			const integrationsUrl = this.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-admin/v1/integrations');
+
+			// Create a promise that always resolves, even on 404
+			const integrationsPromise = $.ajax({
+				url: integrationsUrl,
+				method: 'GET',
+				beforeSend: function(xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', self.nonce);
+				}
+			}).then(
+				function(response) {
+					// Success - return the response
+					return response;
+				},
+				function(xhr) {
+					// Error (including 404) - return empty array structure
+					return { success: false, data: { items: [] } };
+				}
+			);
+
 			$.when(
 				$.ajax({
 					url: this.apiUrl + 'discovery',
 					method: 'GET',
 					beforeSend: function(xhr) {
-						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+						xhr.setRequestHeader('X-WP-Nonce', self.nonce);
 					}
 				}),
 				$.ajax({
 					url: this.apiUrl + 'status',
 					method: 'GET',
 					beforeSend: function(xhr) {
-						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
+						xhr.setRequestHeader('X-WP-Nonce', self.nonce);
 					}
 				}),
-				$.ajax({
-					url: WCSMigrator.apiUrl.replace('wcs-sublium-migrator/v1/', 'sublium-admin/v1/integrations'),
-					method: 'GET',
-					beforeSend: function(xhr) {
-						xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
-					},
-					error: function() {
-						// If integrations endpoint fails (e.g., Sublium Pro not active), return empty array
-						return { success: false, data: { items: [] } };
-					}
-				}).fail(function() {
-					// If integrations endpoint fails, continue without integrations
-					return { success: false, data: { items: [] } };
-				})
+				integrationsPromise
 			).done(function(discoveryResponse, statusResponse, integrationsResponse) {
 				const discoveryData = discoveryResponse[0];
 				const statusData = statusResponse[0];
-				
+
 				// Handle integrations response - it might fail if Sublium Pro is not active
 				let integrationsData = { success: false, data: { items: [] } };
-				if (integrationsResponse && integrationsResponse[0]) {
-					const response = integrationsResponse[0];
-					if (response.success !== false && response.data && response.data.items) {
-						integrationsData = response;
-					}
+				// integrationsResponse is already resolved (either success or error fallback)
+				if (integrationsResponse && integrationsResponse.success !== false && integrationsResponse.data && integrationsResponse.data.items) {
+					integrationsData = integrationsResponse;
 				}
 
 				WCSMigrator.discoveryData = discoveryData;
@@ -125,10 +130,10 @@
 				<ul class="wcs-wizard-steps-list">
 					${steps.map((step, index) => `
 						<li class="wcs-wizard-step ${this.currentStep === step.number ? 'active' : ''} ${this.currentStep > step.number ? 'completed' : ''}">
-							<a href="#" class="wcs-wizard-step-link" data-step="${step.number}">
+							<span class="wcs-wizard-step-link wcs-wizard-step-disabled" data-step="${step.number}">
 								<span class="wcs-wizard-step-number">${this.currentStep > step.number ? '✓' : step.number}</span>
 								<span class="wcs-wizard-step-title">${step.title}</span>
-							</a>
+							</span>
 						</li>
 					`).join('')}
 				</ul>
@@ -359,7 +364,7 @@
 					${!isCompleted && !isInProgress && !isPaused ? `
 						<div class="wcs-wizard-info-box">
 							<p><strong>Ready to migrate products?</strong></p>
-							<p>This will process all ${data.products.total} subscription products and create plans in Sublium. Products migration must be completed before migrating subscriptions.</p>
+							<p>This will process all ${data.products.total} subscription products and create plans in Sublium. Products and subscriptions migrations can be run independently.</p>
 						</div>
 					` : ''}
 				</div>
@@ -413,6 +418,10 @@
 			const isMigrationComplete = subscriptionsMigration.processed_subscriptions >= subscriptionsMigration.total_subscriptions &&
 										productsMigration.processed_products >= productsMigration.total_products &&
 										subscriptionsMigration.total_subscriptions > 0 && productsMigration.total_products > 0;
+			const isProductsInProgress = statusData.status === 'products_migrating';
+			const isSubscriptionsInProgress = statusData.status === 'subscriptions_migrating';
+			const isPaused = statusData.status === 'paused';
+			const isMigrationActive = isProductsInProgress || isSubscriptionsInProgress || isPaused;
 
 			return `
 				<div class="wcs-wizard-step-content">
@@ -438,7 +447,7 @@
 						<div class="wcs-wizard-golive-step">
 							<h3>1. Deactivate WooCommerce Subscriptions</h3>
 							<p>Deactivate the WooCommerce Subscriptions plugin to prevent conflicts with Sublium.</p>
-							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-deactivate-wcs" ${!isMigrationComplete ? 'disabled' : ''}>
+							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-deactivate-wcs" ${!isMigrationComplete || isMigrationActive ? 'disabled' : ''}>
 								Deactivate WooCommerce Subscriptions
 							</button>
 						</div>
@@ -446,7 +455,7 @@
 						<div class="wcs-wizard-golive-step">
 							<h3>2. Convert Subscription Products</h3>
 							<p>Convert WCS subscription products to regular WooCommerce products (only products with no active subscriptions).</p>
-							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-load-products" ${!isMigrationComplete ? 'disabled' : ''}>
+							<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-load-products" ${!isMigrationComplete || isMigrationActive ? 'disabled' : ''}>
 								Load Products
 							</button>
 							<div class="wcs-migrator-products-list" style="display: none; margin-top: 15px;">
@@ -477,18 +486,21 @@
 			const isProductsInProgress = statusData.status === 'products_migrating';
 			const isSubscriptionsInProgress = statusData.status === 'subscriptions_migrating';
 			const isPaused = statusData.status === 'paused';
+			const isMigrationActive = isProductsInProgress || isSubscriptionsInProgress || isPaused;
 
 			let buttons = '';
 
 			// Step-specific action buttons
+			// Allow subscriptions migration to start independently (subscriptions use plan_data directly)
+			// Disable if any migration is active
 			if (this.currentStep === 2 && !isSubscriptionsCompleted && !isSubscriptionsInProgress && !isPaused) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${!isProductsCompleted ? 'disabled title="Please complete products migration first"' : ''}>
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${isMigrationActive ? 'disabled' : ''}>
 					Start Subscriptions Migration
 				</button>`;
 			}
 
 			if (this.currentStep === 3 && !isProductsCompleted && !isProductsInProgress && !isPaused) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-products">
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-products" ${isMigrationActive ? 'disabled' : ''}>
 					Start Products Migration
 				</button>`;
 			}
@@ -509,28 +521,35 @@
 				</button>`;
 			}
 
-			// Navigation buttons
+			// Navigation buttons - disable during active migrations
 			if (this.currentStep > 1) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-prev">
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-wizard-prev" ${isMigrationActive ? 'disabled' : ''}>
 					Previous
 				</button>`;
 			}
 
 			if (this.currentStep < this.totalSteps) {
-				const canProceed = (this.currentStep === 1) ||
-								   (this.currentStep === 2 && (isSubscriptionsCompleted || isSubscriptionsInProgress || isPaused)) ||
-								   (this.currentStep === 3 && (isProductsCompleted || isProductsInProgress || isPaused)) ||
-								   (this.currentStep === 4);
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-wizard-next" ${!canProceed ? 'disabled' : ''}>
+				// Disable next button during active migrations
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-wizard-next" ${isMigrationActive ? 'disabled' : ''}>
 					Next
 				</button>`;
 			}
+
+			// Reset button - disable during active migrations (user should cancel first)
+			buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset" style="margin-left: 10px;" ${isMigrationActive ? 'disabled' : ''}>
+				Reset Migration
+			</button>`;
 
 			return buttons;
 		},
 
 		handleNextStep: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			if (this.currentStep < this.totalSteps) {
 				this.currentStep++;
 				this.loadFeasibility();
@@ -539,6 +558,11 @@
 
 		handlePrevStep: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			if (this.currentStep > 1) {
 				this.currentStep--;
 				this.loadFeasibility();
@@ -681,10 +705,16 @@
 
 		handleStartProductsMigration: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			if (!confirm('Are you sure you want to start products migration? This will process all subscription products and create plans in the background.')) {
 				return;
 			}
 
+			const self = this;
 			$.ajax({
 				url: this.apiUrl + 'start-products',
 				method: 'POST',
@@ -692,20 +722,39 @@
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
 				},
 				success: function(response) {
-					if (response.success) {
+					if (response && response.success) {
 						WCSMigrator.checkMigrationStatus();
 					} else {
-						WCSMigrator.showError(response.message);
+						const errorMsg = (response && response.message) ? response.message : 'Failed to start products migration';
+						WCSMigrator.showError(errorMsg);
 					}
 				},
-				error: function() {
-					WCSMigrator.showError('Failed to start products migration');
+				error: function(xhr, status, error) {
+					let errorMsg = 'Failed to start products migration';
+					if (xhr.responseJSON && xhr.responseJSON.message) {
+						errorMsg = xhr.responseJSON.message;
+					} else if (xhr.responseText) {
+						try {
+							const parsed = JSON.parse(xhr.responseText);
+							if (parsed.message) {
+								errorMsg = parsed.message;
+							}
+						} catch(e) {
+							// Ignore parse errors
+						}
+					}
+					WCSMigrator.showError(errorMsg + ' (Status: ' + xhr.status + ')');
 				}
 			});
 		},
 
 		handleStartSubscriptionsMigration: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 
 			if (this.discoveryData && this.discoveryData.readiness) {
 				const readinessStatus = this.discoveryData.readiness.status;
@@ -808,6 +857,11 @@
 
 		handleResetMigration: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			if (!confirm('Are you sure you want to reset the migration? This will clear all migration progress and allow you to start fresh.')) {
 				return;
 			}
@@ -818,17 +872,40 @@
 					xhr.setRequestHeader('X-WP-Nonce', WCSMigrator.nonce);
 				},
 				success: function(response) {
-					WCSMigrator.currentStep = 1;
-					WCSMigrator.loadFeasibility();
+					if (response && response.success !== false) {
+						WCSMigrator.currentStep = 1;
+						WCSMigrator.loadFeasibility();
+					} else {
+						const errorMsg = (response && response.message) ? response.message : 'Failed to reset migration';
+						WCSMigrator.showError(errorMsg);
+					}
 				},
-				error: function() {
-					WCSMigrator.showError('Failed to reset migration');
+				error: function(xhr, status, error) {
+					let errorMsg = 'Failed to reset migration';
+					if (xhr.responseJSON && xhr.responseJSON.message) {
+						errorMsg = xhr.responseJSON.message;
+					} else if (xhr.responseText) {
+						try {
+							const parsed = JSON.parse(xhr.responseText);
+							if (parsed.message) {
+								errorMsg = parsed.message;
+							}
+						} catch(e) {
+							// Ignore parse errors
+						}
+					}
+					WCSMigrator.showError(errorMsg + ' (Status: ' + xhr.status + ')');
 				}
 			});
 		},
 
 		handleLoadProducts: function(e) {
 			e.preventDefault();
+			const $target = $(e.currentTarget);
+			// Skip if button is disabled
+			if ($target.prop('disabled')) {
+				return;
+			}
 			$.ajax({
 				url: this.apiUrl + 'products/subscription-products',
 				method: 'GET',

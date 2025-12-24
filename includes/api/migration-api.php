@@ -331,6 +331,11 @@ class Migration_API {
 	 * @return \WP_REST_Response
 	 */
 	public function reset_migration( $request ) {
+		// Clear scheduled cron jobs first.
+		wp_clear_scheduled_hook( 'wcs_sublium_migrate_products_batch' );
+		wp_clear_scheduled_hook( 'wcs_sublium_migrate_subscriptions_batch' );
+
+		// Reset state (this will also clear scheduled hooks, but we do it explicitly above too).
 		$state = new \WCS_Sublium_Migrator\Migration\State();
 		$state->reset_state();
 

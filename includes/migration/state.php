@@ -33,7 +33,7 @@ class State {
 	public function get_state() {
 		$state = get_option( self::STATE_OPTION_NAME, array() );
 		$default_state = $this->get_default_state();
-		
+
 		// Merge with defaults to ensure all keys exist.
 		if ( is_array( $state ) ) {
 			$state = array_merge( $default_state, $state );
@@ -50,7 +50,7 @@ class State {
 			}
 			return $state;
 		}
-		
+
 		return $default_state;
 	}
 
@@ -102,7 +102,15 @@ class State {
 	 * @return void
 	 */
 	public function reset_state() {
+		// Clear any scheduled migration batches first.
+		wp_clear_scheduled_hook( 'wcs_sublium_migrate_products_batch' );
+		wp_clear_scheduled_hook( 'wcs_sublium_migrate_subscriptions_batch' );
+
+		// Delete the state option.
 		delete_option( self::STATE_OPTION_NAME );
+
+		// Force WordPress to clear any cached option values.
+		wp_cache_delete( self::STATE_OPTION_NAME, 'options' );
 	}
 
 	/**
