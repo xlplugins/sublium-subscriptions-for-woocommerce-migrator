@@ -237,3 +237,268 @@
 	background: #f7f7f7;
 	font-weight: 600;
 }
+
+/* Wizard Styles */
+.wcs-wizard {
+	background: #fff;
+	border: 1px solid #ccd0d4;
+	border-radius: 4px;
+	padding: 20px;
+}
+
+.wcs-wizard-steps {
+	margin-bottom: 30px;
+	border-bottom: 2px solid #e0e0e0;
+	padding-bottom: 20px;
+}
+
+.wcs-wizard-steps-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	justify-content: space-between;
+	position: relative;
+}
+
+.wcs-wizard-steps-list::before {
+	content: '';
+	position: absolute;
+	top: 20px;
+	left: 0;
+	right: 0;
+	height: 2px;
+	background: #e0e0e0;
+	z-index: 0;
+}
+
+.wcs-wizard-step {
+	flex: 1;
+	position: relative;
+	z-index: 1;
+}
+
+.wcs-wizard-step-link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-decoration: none;
+	color: #666;
+	cursor: pointer;
+	position: relative;
+}
+
+.wcs-wizard-step-link:hover {
+	color: #2271b1;
+}
+
+.wcs-wizard-step-number {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: #f0f0f1;
+	border: 2px solid #ddd;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 600;
+	margin-bottom: 8px;
+	transition: all 0.3s ease;
+}
+
+.wcs-wizard-step.active .wcs-wizard-step-number {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+
+.wcs-wizard-step.completed .wcs-wizard-step-number {
+	background: #46b450;
+	border-color: #46b450;
+	color: #fff;
+}
+
+.wcs-wizard-step-title {
+	font-size: 12px;
+	font-weight: 500;
+	text-align: center;
+	max-width: 120px;
+}
+
+.wcs-wizard-step.active .wcs-wizard-step-title {
+	color: #2271b1;
+	font-weight: 600;
+}
+
+.wcs-wizard-content {
+	min-height: 400px;
+	padding: 20px 0;
+}
+
+.wcs-wizard-step-content h2 {
+	margin-top: 0;
+	color: #1d2327;
+}
+
+.wcs-wizard-description {
+	color: #646970;
+	margin-bottom: 20px;
+	font-size: 14px;
+}
+
+.wcs-wizard-actions {
+	margin-top: 30px;
+	padding-top: 20px;
+	border-top: 1px solid #e0e0e0;
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+}
+
+.wcs-wizard-info-box {
+	background: #f0f6fc;
+	border: 1px solid #c3d4e6;
+	border-radius: 4px;
+	padding: 15px;
+	margin: 20px 0;
+}
+
+.wcs-wizard-info-box p {
+	margin: 5px 0;
+}
+
+.wcs-wizard-info-box p:first-child {
+	margin-top: 0;
+}
+
+.wcs-wizard-info-box p:last-child {
+	margin-bottom: 0;
+}
+
+.wcs-wizard-summary {
+	font-size: 14px;
+	color: #646970;
+	margin-bottom: 20px;
+}
+
+.wcs-wizard-integrations {
+	margin: 20px 0;
+}
+
+.wcs-wizard-integrations-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 15px;
+	margin-top: 20px;
+}
+
+.wcs-wizard-integration-item {
+	background: #f9f9f9;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 15px;
+	transition: all 0.3s ease;
+}
+
+.wcs-wizard-integration-item:hover {
+	border-color: #2271b1;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.wcs-wizard-integration-item.installed {
+	border-left: 4px solid #46b450;
+}
+
+.wcs-wizard-integration-item.connected {
+	background: #f0f9ff;
+	border-color: #2271b1;
+}
+
+.wcs-wizard-integration-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 10px;
+}
+
+.wcs-wizard-integration-header h4 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.wcs-wizard-integration-status {
+	font-size: 11px;
+}
+
+.wcs-wizard-integration-status .status-connected {
+	color: #46b450;
+	font-weight: 600;
+}
+
+.wcs-wizard-integration-status .status-not-connected {
+	color: #d63638;
+}
+
+.wcs-wizard-integration-status .status-not-installed {
+	color: #646970;
+}
+
+.wcs-wizard-integration-description {
+	font-size: 12px;
+	color: #646970;
+	margin: 0;
+	line-height: 1.5;
+}
+
+.wcs-wizard-golive-steps {
+	margin-top: 30px;
+}
+
+.wcs-wizard-golive-step {
+	background: #f9f9f9;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 20px;
+	margin-bottom: 20px;
+}
+
+.wcs-wizard-golive-step h3 {
+	margin-top: 0;
+	color: #1d2327;
+	font-size: 16px;
+}
+
+.wcs-wizard-golive-step p {
+	color: #646970;
+	margin-bottom: 15px;
+}
+
+.stat-note {
+	font-size: 11px;
+	color: #646970;
+	margin-top: 5px;
+	margin-bottom: 0;
+}
+
+.wcs-migrator-subscription-statuses {
+	margin: 20px 0;
+}
+
+.wcs-migrator-subscription-statuses table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.wcs-migrator-subscription-statuses th,
+.wcs-migrator-subscription-statuses td {
+	padding: 10px;
+	text-align: left;
+	border-bottom: 1px solid #ddd;
+}
+
+.wcs-migrator-subscription-statuses th {
+	background: #f7f7f7;
+	font-weight: 600;
+}

@@ -134,6 +134,17 @@ class Migration_API {
 			)
 		);
 
+		// Reset endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/reset',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'reset_migration' ),
+				'permission_callback' => array( $this, 'check_permissions' ),
+			)
+		);
+
 		// Get subscription products endpoint.
 		register_rest_route(
 			$this->namespace,
@@ -308,6 +319,25 @@ class Migration_API {
 			array(
 				'success' => true,
 				'message' => __( 'Migration cancelled', 'wcs-sublium-migrator' ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Reset migration.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function reset_migration( $request ) {
+		$state = \WCS_Sublium_Migrator\Migration\State::get_instance();
+		$state->reset_state();
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'message' => __( 'Migration reset successfully', 'wcs-sublium-migrator' ),
 			),
 			200
 		);
