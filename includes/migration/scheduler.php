@@ -294,6 +294,10 @@ class Scheduler {
 		$processor = new Products_Processor();
 		$result = $processor->process_batch( $offset );
 
+		// Get updated state after processing.
+		$current_state = $state->get_state();
+		$processed_products = absint( $current_state['products_migration']['processed_products'] ?? 0 );
+
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
 			$this->schedule_products_batch( $result['next_offset'] );
@@ -305,7 +309,7 @@ class Scheduler {
 				// Processed count equals or exceeds total - migration complete.
 				$state->set_status( 'idle' );
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					error_log( sprintf( 'WCS Migrator: Migration complete - processed=%d, total=%d', $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					error_log( sprintf( 'WCS Migrator: Products migration complete - processed=%d, total=%d', $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 				}
 			} elseif ( $actual_total > 0 && $processed_products < $actual_total ) {
 				// Not complete yet - check if next offset would exceed total.
@@ -320,7 +324,7 @@ class Scheduler {
 					$state->set_status( 'products_migrating' );
 					$this->schedule_products_batch( $next_offset );
 					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-						error_log( sprintf( 'WCS Migrator: Scheduling next batch at offset=%d (processed=%d, total=%d)', $next_offset, $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+						error_log( sprintf( 'WCS Migrator: Scheduling next products batch at offset=%d (processed=%d, total=%d)', $next_offset, $processed_products, $actual_total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 					}
 				} else {
 					// Next offset would exceed total - migration complete.
@@ -343,22 +347,71 @@ class Scheduler {
 	 * @return void
 	 */
 	public function process_subscriptions_batch( $offset = 0 ) {
+		$state = new State();
+		$current_state = $state->get_state();
+
 		$processor = new Subscriptions_Processor();
 		$result = $processor->process_batch( $offset );
+
+		// Get updated state after processing.
+		$current_state = $state->get_state();
+		$processed = absint( $current_state['subscriptions_migration']['processed_subscriptions'] ?? 0 );
+		$total = absint( $current_state['subscriptions_migration']['total_subscriptions'] ?? 0 );
 
 		if ( $result['has_more'] ) {
 			// Schedule next batch.
 			$this->schedule_subscriptions_batch( $result['next_offset'] );
+			// Ensure status remains 'subscriptions_migrating' while processing.
+			$state->set_status( 'subscriptions_migrating' );
 		} else {
-			// Migration complete.
-			$state = new State();
-			$state->set_status( 'completed' );
-			$current_state = $state->get_state();
-			$current_state['end_time'] = current_time( 'mysql' );
-			$state->update_state( $current_state );
+			// No more items in this batch - check if migration is actually complete.
+			if ( $total > 0 && $processed >= $total ) {
+				// All subscriptions processed - migration complete.
+				$state->set_status( 'completed' );
+				$current_state = $state->get_state();
+				$current_state['end_time'] = current_time( 'mysql' );
+				$state->update_state( $current_state );
 
-			// Trigger post-migration hook.
-			do_action( 'wcs_sublium_migration_completed', $current_state );
+				// Trigger post-migration hook.
+				do_action( 'wcs_sublium_migration_completed', $current_state );
+			} elseif ( $total > 0 && $processed < $total ) {
+				// Not complete yet - try to schedule next batch if offset hasn't exceeded total.
+				$reflection = new \ReflectionClass( $processor );
+				$batch_size_property = $reflection->getProperty( 'batch_size' );
+				$batch_size_property->setAccessible( true );
+				$batch_size = $batch_size_property->getValue( $processor );
+				$next_offset = $offset + $batch_size;
+
+				if ( $next_offset < $total ) {
+					// Schedule next batch if we haven't exceeded total.
+					$state->set_status( 'subscriptions_migrating' );
+					$this->schedule_subscriptions_batch( $next_offset );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Scheduling next subscriptions batch at offset=%d (processed=%d, total=%d)', $next_offset, $processed, $total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
+				} else {
+					// Next offset would exceed total - migration complete.
+					$state->set_status( 'completed' );
+					$current_state = $state->get_state();
+					$current_state['end_time'] = current_time( 'mysql' );
+					$state->update_state( $current_state );
+
+					// Trigger post-migration hook.
+					do_action( 'wcs_sublium_migration_completed', $current_state );
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Subscriptions migration complete - processed=%d, total=%d', $processed, $total ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
+				}
+			} else {
+				// No subscriptions to process or already complete.
+				$state->set_status( 'completed' );
+				$current_state = $state->get_state();
+				$current_state['end_time'] = current_time( 'mysql' );
+				$state->update_state( $current_state );
+
+				// Trigger post-migration hook.
+				do_action( 'wcs_sublium_migration_completed', $current_state );
+			}
 		}
 	}
 

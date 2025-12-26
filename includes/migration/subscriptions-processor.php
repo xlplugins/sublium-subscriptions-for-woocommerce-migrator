@@ -25,7 +25,7 @@ class Subscriptions_Processor {
 	 *
 	 * @var int
 	 */
-	private $batch_size = 3; // Set to 1 for testing progress bar updates.
+	private $batch_size = 10; // Set to 1 for testing progress bar updates.
 
 	/**
 	 * Process a batch of subscriptions.
@@ -81,17 +81,30 @@ class Subscriptions_Processor {
 					);
 				}
 
+				// Check if subscription was already migrated before calling migrate_subscription.
+				$was_already_migrated = ! empty( $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true ) );
+
 				$result = $this->migrate_subscription( $wcs_subscription );
+				file_put_contents( __DIR__ . '/debug.log', print_r( $result, true ) . "\n", FILE_APPEND );
 				if ( $result ) {
-					++$created;
+					// Result is a subscription ID (either newly created or already migrated).
+					if ( $was_already_migrated ) {
+						// Already migrated - count as processed but not created.
+						++$processed;
+					} else {
+						// Newly migrated - count as both processed and created.
+						++$created;
+						++$processed;
+					}
 				} else {
+					// Migration failed - count as processed and failed.
 					++$failed;
+					++$processed;
 					$state->add_error(
 						sprintf( 'Failed to migrate subscription %d', $subscription_id ),
 						array( 'subscription_id' => $subscription_id )
 					);
 				}
-				++$processed;
 			} catch ( \Exception $e ) {
 				++$failed;
 				$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
@@ -152,17 +165,30 @@ class Subscriptions_Processor {
 			return array();
 		}
 
+		// Only fetch subscriptions that haven't been migrated yet.
+		// Exclude subscriptions that have _sublium_wcs_subscription_id meta key.
 		$subscriptions = wcs_get_subscriptions(
 			array(
-				'status'  => 'any', // Migrate all subscriptions including on-hold, cancelled, expired, etc.
-				'limit'   => $limit,
-				'offset'  => $offset,
-				'orderby' => 'ID',
-				'order'   => 'ASC',
-				'return'  => 'ids',
+				'status'     => 'any', // Migrate all subscriptions including on-hold, cancelled, expired, etc.
+				'limit'      => $limit,
+				'offset'     => $offset,
+				'orderby'    => 'ID',
+				'order'      => 'ASC',
+				'return'     => 'ids',
+				'meta_query' => array(
+					'relation' => 'OR',
+					array(
+						'key'     => '_sublium_wcs_subscription_id',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'     => '_sublium_wcs_subscription_id',
+						'value'   => '',
+						'compare' => '=',
+					),
+				),
 			)
 		);
-
 
 		if ( empty( $subscriptions ) || ! is_array( $subscriptions ) ) {
 			return array();
@@ -173,11 +199,15 @@ class Subscriptions_Processor {
 		foreach ( $subscriptions as $subscription_id ) {
 			$subscription = wcs_get_subscription( $subscription_id );
 			if ( $subscription && is_a( $subscription, 'WC_Subscription' ) ) {
-				$subscription_objects[] = $subscription;
-			} else {
+				// Double-check: verify subscription hasn't been migrated (in case meta was added between query and now).
+				$existing_sublium_id = $subscription->get_meta( '_sublium_wcs_subscription_id', true );
+				if ( empty( $existing_sublium_id ) ) {
+					$subscription_objects[] = $subscription;
+				} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Subscription %d already has migration meta, skipping', $subscription_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
 			}
 		}
-
 
 		return $subscription_objects;
 	}

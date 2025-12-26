@@ -178,10 +178,71 @@
 		},
 
 		renderStep1HealthCheck: function(data, statusData) {
+			const subscriptionsMigration = statusData.subscriptions_migration || {};
+			const productsMigration = statusData.products_migration || {};
+			const isProductsInProgress = statusData.status === 'products_migrating';
+			const isSubscriptionsInProgress = statusData.status === 'subscriptions_migrating';
+			const isPaused = statusData.status === 'paused';
+			const isMigrationActive = isProductsInProgress || isSubscriptionsInProgress || isPaused;
+			const isMigrationCompleted = statusData.status === 'completed';
+
+			const productsProcessed = parseInt(productsMigration.processed_products || 0, 10);
+			const productsTotal = parseInt(productsMigration.total_products || 0, 10);
+			const subscriptionsProcessed = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
+			const subscriptionsTotal = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
+
+			const productsProgress = productsTotal > 0 ? Math.round((productsProcessed / productsTotal) * 100) : 0;
+			const subscriptionsProgress = subscriptionsTotal > 0 ? Math.round((subscriptionsProcessed / subscriptionsTotal) * 100) : 0;
+
+			const hasProductsProgress = productsProcessed > 0 || productsTotal > 0;
+			const hasSubscriptionsProgress = subscriptionsProcessed > 0 || subscriptionsTotal > 0;
+			const hasAnyMigrationProgress = hasProductsProgress || hasSubscriptionsProgress || isMigrationCompleted;
+
 			return `
 				<div class="wcs-wizard-step-content">
 					<h2>Health Check</h2>
 					<p class="wcs-wizard-description">Review your current WooCommerce Subscriptions setup and migration readiness.</p>
+
+					${hasAnyMigrationProgress ? `
+					<div class="wcs-migrator-migration-status" style="margin-bottom: 20px; padding: 15px; background: #f0f0f1; border-left: 4px solid #2271b1; border-radius: 4px;">
+						<h3 style="margin-top: 0;">Migration Status</h3>
+						${isMigrationCompleted ? `
+							<p style="color: #00a32a; font-weight: bold; margin: 0 0 10px 0;">
+								✓ Migration Completed
+							</p>
+						` : isMigrationActive ? `
+							<p style="color: #2271b1; font-weight: bold; margin: 0 0 10px 0;">
+								${isPaused ? '⏸ Migration Paused' : '⟳ Migration In Progress'}
+							</p>
+						` : hasAnyMigrationProgress ? `
+							<p style="color: #646970; font-weight: bold; margin: 0 0 10px 0;">
+								Migration Started
+							</p>
+						` : ''}
+
+						${hasProductsProgress ? `
+							<div style="margin-bottom: 10px;">
+								<strong>Products Migration:</strong> ${productsProcessed} / ${productsTotal} (${productsProgress}%)
+								${productsTotal > 0 ? `
+									<div style="width: 100%; background: #ddd; border-radius: 4px; height: 20px; margin-top: 5px; overflow: hidden;">
+										<div style="width: ${productsProgress}%; background: ${isProductsInProgress ? '#2271b1' : '#00a32a'}; height: 100%; transition: width 0.3s;"></div>
+									</div>
+								` : ''}
+							</div>
+						` : ''}
+
+						${hasSubscriptionsProgress ? `
+							<div style="margin-bottom: 10px;">
+								<strong>Subscriptions Migration:</strong> ${subscriptionsProcessed} / ${subscriptionsTotal} (${subscriptionsProgress}%)
+								${subscriptionsTotal > 0 ? `
+									<div style="width: 100%; background: #ddd; border-radius: 4px; height: 20px; margin-top: 5px; overflow: hidden;">
+										<div style="width: ${subscriptionsProgress}%; background: ${isSubscriptionsInProgress ? '#2271b1' : '#00a32a'}; height: 100%; transition: width 0.3s;"></div>
+									</div>
+								` : ''}
+							</div>
+						` : ''}
+					</div>
+					` : ''}
 
 					<div class="wcs-migrator-readiness ${data.readiness.status}">
 						<strong>Status:</strong> ${data.readiness.message}
@@ -516,6 +577,12 @@
 			const isPaused = statusData.status === 'paused';
 			const isMigrationActive = isProductsInProgress || isSubscriptionsInProgress || isPaused;
 
+			// Check if any migration has been completed (has processed items)
+			const hasProductsProcessed = parseInt(productsMigration.processed_products || 0, 10) > 0;
+			const hasSubscriptionsProcessed = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10) > 0;
+			const isMigrationCompleted = statusData.status === 'completed';
+			const hasAnyMigrationCompleted = hasProductsProcessed || hasSubscriptionsProcessed || isMigrationCompleted;
+
 			let buttons = '';
 
 			// Step-specific action buttons
@@ -563,10 +630,12 @@
 				</button>`;
 			}
 
-			// Reset button - disable during active migrations (user should cancel first)
-			buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset" style="margin-left: 10px;" ${isMigrationActive ? 'disabled' : ''}>
-				Reset Migration
-			</button>`;
+			// Reset button - only show if any migration has been completed, disable during active migrations
+			if (hasAnyMigrationCompleted) {
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-secondary wcs-migrator-reset" style="margin-left: 10px;" ${isMigrationActive ? 'disabled' : ''}>
+					Reset Migration
+				</button>`;
+			}
 
 			return buttons;
 		},
@@ -743,13 +812,25 @@
 					const isInProgress = response.status === 'products_migrating' || response.status === 'subscriptions_migrating' || response.status === 'paused' || isProductsIncomplete || isSubscriptionsIncomplete;
 
 					if (isInProgress) {
+						// Migration in progress - update progress UI with cached discovery data
 						WCSMigrator.renderProgress(response);
 						WCSMigrator.startStatusPolling();
 					} else if (response.status === 'completed') {
+						// Migration completed - stop polling and reload full data once
+						WCSMigrator.stopStatusPolling();
 						WCSMigrator.currentStep = 5;
 						WCSMigrator.loadFeasibility();
 					} else {
-						WCSMigrator.loadFeasibility();
+						// Migration not in progress - stop polling and update UI with cached data
+						WCSMigrator.stopStatusPolling();
+						// Only reload if we don't have cached discovery data
+						if (WCSMigrator.discoveryData) {
+							// Use cached data to update wizard
+							WCSMigrator.renderWizard(WCSMigrator.discoveryData, response);
+						} else {
+							// No cached data - load fresh data
+							WCSMigrator.loadFeasibility();
+						}
 					}
 				},
 				error: function() {
