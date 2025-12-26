@@ -50,7 +50,6 @@ class Subscriptions_Processor {
 
 		// Get subscriptions batch.
 		$subscriptions = $this->get_subscriptions_batch( $offset, $this->batch_size );
-
 		$processed     = 0;
 		$created       = 0;
 		$failed        = 0;
@@ -85,7 +84,6 @@ class Subscriptions_Processor {
 				$was_already_migrated = ! empty( $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true ) );
 
 				$result = $this->migrate_subscription( $wcs_subscription );
-				file_put_contents( __DIR__ . '/debug.log', print_r( $result, true ) . "\n", FILE_APPEND );
 				if ( $result ) {
 					// Result is a subscription ID (either newly created or already migrated).
 					if ( $was_already_migrated ) {
@@ -137,6 +135,18 @@ class Subscriptions_Processor {
 				'current_batch'           => floor( $new_processed / $this->batch_size ),
 			)
 		);
+
+		// Clear object cache to free memory after processing batch.
+		foreach ( $subscriptions as $subscription ) {
+			if ( is_a( $subscription, 'WC_Subscription' ) ) {
+				wp_cache_delete( $subscription->get_id(), 'posts' );
+				wp_cache_delete( $subscription->get_id(), 'post_meta' );
+			}
+		}
+		// Clear WooCommerce object cache.
+		if ( function_exists( 'wc_delete_product_transients' ) ) {
+			wc_delete_product_transients( 0 );
+		}
 
 		// Check if more subscriptions exist.
 		$has_more    = count( $subscriptions ) === $this->batch_size;
@@ -195,17 +205,13 @@ class Subscriptions_Processor {
 		}
 
 		// Convert IDs to subscription objects.
+		// Note: We return all subscriptions here, even if already migrated.
+		// The processing loop will count them as "processed" even if skipped.
 		$subscription_objects = array();
 		foreach ( $subscriptions as $subscription_id ) {
 			$subscription = wcs_get_subscription( $subscription_id );
 			if ( $subscription && is_a( $subscription, 'WC_Subscription' ) ) {
-				// Double-check: verify subscription hasn't been migrated (in case meta was added between query and now).
-				$existing_sublium_id = $subscription->get_meta( '_sublium_wcs_subscription_id', true );
-				if ( empty( $existing_sublium_id ) ) {
-					$subscription_objects[] = $subscription;
-				} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					error_log( sprintf( 'WCS Migrator: Subscription %d already has migration meta, skipping', $subscription_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				}
+				$subscription_objects[] = $subscription;
 			}
 		}
 

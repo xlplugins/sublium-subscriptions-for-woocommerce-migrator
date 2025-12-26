@@ -323,7 +323,15 @@
 
 		renderStep2Subscriptions: function(data, statusData) {
 			const subscriptionsMigration = statusData.subscriptions_migration || {};
-			const isCompleted = subscriptionsMigration.processed_subscriptions >= subscriptionsMigration.total_subscriptions && subscriptionsMigration.total_subscriptions > 0;
+			const totalSubscriptions = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
+			const processedSubscriptions = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
+			const activeSubscriptions = parseInt(data.active_subscriptions || 0, 10);
+
+			// Check if all subscriptions are migrated
+			// If total_subscriptions is 0 but we have active subscriptions, check if they're all migrated
+			const hasUnmigratedSubscriptions = totalSubscriptions > 0 && processedSubscriptions < totalSubscriptions;
+			const isCompleted = totalSubscriptions > 0 && processedSubscriptions >= totalSubscriptions;
+			const allMigrated = activeSubscriptions > 0 && totalSubscriptions === 0 && processedSubscriptions === 0;
 			const isInProgress = statusData.status === 'subscriptions_migrating';
 			const isPaused = statusData.status === 'paused';
 
@@ -361,28 +369,36 @@
 					${isInProgress || isPaused ? `
 						<div class="wcs-migrator-progress">
 							<div class="wcs-migrator-progress-label">
-								Subscriptions Migration: ${subscriptionsMigration.processed_subscriptions || 0} / ${subscriptionsMigration.total_subscriptions || 0}
+								Subscriptions Migration: ${processedSubscriptions} / ${totalSubscriptions || 0}
 								${subscriptionsMigration.created_subscriptions ? ` (${subscriptionsMigration.created_subscriptions} created)` : ''}
 							</div>
 							<div class="wcs-migrator-progress-bar">
-								<div class="wcs-migrator-progress-fill" style="width: ${Math.min(100, ((subscriptionsMigration.processed_subscriptions || 0) / (subscriptionsMigration.total_subscriptions || 1)) * 100)}%">
-									${Math.round(Math.min(100, ((subscriptionsMigration.processed_subscriptions || 0) / (subscriptionsMigration.total_subscriptions || 1)) * 100))}%
+								<div class="wcs-migrator-progress-fill" style="width: ${Math.min(100, (processedSubscriptions / (totalSubscriptions || 1)) * 100)}%">
+									${Math.round(Math.min(100, (processedSubscriptions / (totalSubscriptions || 1)) * 100))}%
 								</div>
 							</div>
 						</div>
 					` : ''}
 
-					${isCompleted ? `
-						<div class="wcs-migrator-success-message">
-							<p><strong>✓ Subscriptions migration completed!</strong></p>
-							<p>${subscriptionsMigration.created_subscriptions || 0} subscriptions migrated successfully.</p>
+					${isCompleted || allMigrated ? `
+						<div class="wcs-migrator-success-message" style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; margin: 20px 0;">
+							<p><strong>✓ WCS Subscriptions Migrated</strong></p>
+							<p>All ${activeSubscriptions || processedSubscriptions} subscriptions have been migrated to Sublium.</p>
+							${subscriptionsMigration.created_subscriptions ? `<p>${subscriptionsMigration.created_subscriptions} subscriptions were created during migration.</p>` : ''}
 						</div>
 					` : ''}
 
-					${!isCompleted && !isInProgress && !isPaused ? `
+					${hasUnmigratedSubscriptions && !isInProgress && !isPaused ? `
 						<div class="wcs-wizard-info-box">
 							<p><strong>Ready to migrate subscriptions?</strong></p>
-							<p>This will process all ${data.active_subscriptions} subscriptions in the background. The migration can be paused or resumed at any time.</p>
+							<p>This will process ${totalSubscriptions} unmigrated subscriptions in the background. The migration can be paused or resumed at any time.</p>
+						</div>
+					` : ''}
+
+					${!hasUnmigratedSubscriptions && !isCompleted && !allMigrated && !isInProgress && !isPaused && activeSubscriptions > 0 ? `
+						<div class="wcs-wizard-info-box">
+							<p><strong>Ready to migrate subscriptions?</strong></p>
+							<p>This will process all ${activeSubscriptions} subscriptions in the background. The migration can be paused or resumed at any time.</p>
 						</div>
 					` : ''}
 				</div>
@@ -391,7 +407,14 @@
 
 		renderStep3Products: function(data, statusData) {
 			const productsMigration = statusData.products_migration || {};
-			const isCompleted = productsMigration.processed_products >= productsMigration.total_products && productsMigration.total_products > 0;
+			const totalProducts = parseInt(productsMigration.total_products || 0, 10);
+			const processedProducts = parseInt(productsMigration.processed_products || 0, 10);
+			const totalProductsFromDiscovery = parseInt((data.products.simple_count || 0) + (data.products.variable_count || 0) + (data.products.wcsatt_count || 0), 10);
+
+			// Check if all products are migrated
+			const hasUnmigratedProducts = totalProducts > 0 && processedProducts < totalProducts;
+			const isCompleted = totalProducts > 0 && processedProducts >= totalProducts;
+			const allMigrated = totalProductsFromDiscovery > 0 && totalProducts === 0 && processedProducts === 0;
 			const isInProgress = statusData.status === 'products_migrating';
 			const isPaused = statusData.status === 'paused';
 
@@ -435,17 +458,25 @@
 						</div>
 					` : ''}
 
-					${isCompleted ? `
-						<div class="wcs-migrator-success-message">
-							<p><strong>✓ Products migration completed!</strong></p>
-							<p>${productsMigration.created_plans || 0} plans created successfully.</p>
+					${isCompleted || allMigrated ? `
+						<div class="wcs-migrator-success-message" style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; margin: 20px 0;">
+							<p><strong>✓ WCS Products Migrated</strong></p>
+							<p>All ${totalProductsFromDiscovery || processedProducts} products have been migrated to Sublium.</p>
+							${productsMigration.created_plans ? `<p>${productsMigration.created_plans} plans were created during migration.</p>` : ''}
 						</div>
 					` : ''}
 
-					${!isCompleted && !isInProgress && !isPaused ? `
+					${hasUnmigratedProducts && !isInProgress && !isPaused ? `
 						<div class="wcs-wizard-info-box">
 							<p><strong>Ready to migrate products?</strong></p>
-							<p>This will process all ${data.products.total} subscription products and create plans in Sublium. Products and subscriptions migrations can be run independently.</p>
+							<p>This will process ${totalProducts} unmigrated products in the background. The migration can be paused or resumed at any time.</p>
+						</div>
+					` : ''}
+
+					${!hasUnmigratedProducts && !isCompleted && !allMigrated && !isInProgress && !isPaused && totalProductsFromDiscovery > 0 ? `
+						<div class="wcs-wizard-info-box">
+							<p><strong>Ready to migrate products?</strong></p>
+							<p>This will process all ${totalProductsFromDiscovery} products in the background. The migration can be paused or resumed at any time.</p>
 						</div>
 					` : ''}
 				</div>
@@ -588,16 +619,35 @@
 			// Step-specific action buttons
 			// Allow subscriptions migration to start independently (subscriptions use plan_data directly)
 			// Disable if any migration is active
+			// Only show button if there are unmigrated subscriptions
 			if (this.currentStep === 2 && !isSubscriptionsCompleted && !isSubscriptionsInProgress && !isPaused) {
-				buttons += `<button type="button" class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${isMigrationActive ? 'disabled' : ''}>
-					Start Subscriptions Migration
-				</button>`;
+				const totalSubs = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
+				const processedSubs = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
+				const hasUnmigratedSubs = totalSubs > 0 && processedSubs < totalSubs;
+				const activeSubs = parseInt(discoveryData?.active_subscriptions || 0, 10);
+				const allSubsMigrated = activeSubs > 0 && totalSubs === 0 && processedSubs === 0;
+
+				// Only show button if there are unmigrated subscriptions
+				if (hasUnmigratedSubs || (!allSubsMigrated && totalSubs === 0 && activeSubs > 0)) {
+					buttons += `<button type="button" class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" ${isMigrationActive ? 'disabled' : ''}>
+						Start Subscriptions Migration
+					</button>`;
+				}
 			}
 
 			if (this.currentStep === 3 && !isProductsCompleted && !isProductsInProgress && !isPaused) {
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-products" ${isMigrationActive ? 'disabled' : ''}>
-					Start Products Migration
-				</button>`;
+				const totalProds = parseInt(productsMigration.total_products || 0, 10);
+				const processedProds = parseInt(productsMigration.processed_products || 0, 10);
+				const hasUnmigratedProds = totalProds > 0 && processedProds < totalProds;
+				const totalProdsFromDiscovery = parseInt((discoveryData?.products?.simple_count || 0) + (discoveryData?.products?.variable_count || 0) + (discoveryData?.products?.wcsatt_count || 0), 10);
+				const allProdsMigrated = totalProdsFromDiscovery > 0 && totalProds === 0 && processedProds === 0;
+
+				// Only show button if there are unmigrated products
+				if (hasUnmigratedProds || (!allProdsMigrated && totalProds === 0 && totalProdsFromDiscovery > 0)) {
+					buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-products" ${isMigrationActive ? 'disabled' : ''}>
+						Start Products Migration
+					</button>`;
+				}
 			}
 
 			// Progress control buttons

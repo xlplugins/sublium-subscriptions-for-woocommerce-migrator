@@ -194,8 +194,34 @@ class Scheduler {
 				);
 			}
 
-			// Initialize state with counts.
-			$current_state['subscriptions_migration']['total_subscriptions'] = $feasibility['active_subscriptions'];
+			// Count only unmigrated subscriptions (exclude those with _sublium_wcs_subscription_id meta).
+			// This ensures total_subscriptions matches what get_subscriptions_batch() will actually process.
+			$unmigrated_count = 0;
+			if ( function_exists( 'wcs_get_subscriptions' ) ) {
+				$unmigrated_subscriptions = wcs_get_subscriptions(
+					array(
+						'status'     => 'any',
+						'limit'      => -1,
+						'return'     => 'ids',
+						'meta_query' => array(
+							'relation' => 'OR',
+							array(
+								'key'     => '_sublium_wcs_subscription_id',
+								'compare' => 'NOT EXISTS',
+							),
+							array(
+								'key'     => '_sublium_wcs_subscription_id',
+								'value'   => '',
+								'compare' => '=',
+							),
+						),
+					)
+				);
+				$unmigrated_count = is_array( $unmigrated_subscriptions ) ? count( $unmigrated_subscriptions ) : 0;
+			}
+
+			// Initialize state with counts (only unmigrated subscriptions).
+			$current_state['subscriptions_migration']['total_subscriptions'] = $unmigrated_count;
 			if ( empty( $current_state['start_time'] ) ) {
 				$current_state['start_time'] = current_time( 'mysql' );
 			}
