@@ -466,7 +466,43 @@ class Subscriptions_Processor {
 			'wcs_subscription_id' => absint( $wcs_subscription->get_id() ), // Store WCS subscription ID for maintaining relationship.
 		);
 
-		// Add billing and shipping details.
+		// Copy all WCS subscription meta data.
+		$wcs_meta_data = $wcs_subscription->get_meta_data();
+		if ( ! empty( $wcs_meta_data ) && is_array( $wcs_meta_data ) ) {
+			// Keys to exclude from copying (internal/system keys that shouldn't be migrated).
+			$excluded_keys = array(
+				'_sublium_wcs_subscription_id', // We set this separately.
+				'_subscription_renewal_order', // Internal WCS renewal order tracking.
+				'_subscription_switch', // Internal WCS switch tracking.
+				'_subscription_resubscribe', // Internal WCS resubscribe tracking.
+			);
+
+			foreach ( $wcs_meta_data as $meta ) {
+				if ( ! is_a( $meta, 'WC_Meta_Data' ) ) {
+					continue;
+				}
+
+				$meta_key   = $meta->key;
+				$meta_value = $meta->value;
+
+				// Skip excluded keys (internal/system keys that shouldn't be migrated).
+				if ( in_array( $meta_key, $excluded_keys, true ) ) {
+					continue;
+				}
+
+				// Skip empty values unless it's a numeric zero or boolean false.
+				if ( '' === $meta_value && ! is_numeric( $meta_value ) && false !== $meta_value ) {
+					continue;
+				}
+
+				// Add WCS meta to our meta_data array, but don't overwrite fields we've already set.
+				if ( ! isset( $meta_data[ $meta_key ] ) ) {
+					$meta_data[ $meta_key ] = $meta_value;
+				}
+			}
+		}
+
+		// Add billing and shipping details (these override any WCS meta with same keys).
 		$billing_details  = $this->extract_address_data( $wcs_subscription, 'billing' );
 		$shipping_details = $this->extract_address_data( $wcs_subscription, 'shipping' );
 		if ( ! empty( $billing_details ) ) {
@@ -476,13 +512,13 @@ class Subscriptions_Processor {
 			$meta_data['shipping_details'] = $shipping_details;
 		}
 
-		// Add payment method details.
+		// Add payment method details (override any WCS meta with same key).
 		$payment_method_title = $wcs_subscription->get_payment_method_title();
 		if ( ! empty( $payment_method_title ) ) {
 			$meta_data['payment_method_title'] = $payment_method_title;
 		}
 
-		// Add trial end date if exists.
+		// Add trial end date if exists (override any WCS meta with same keys).
 		if ( ! empty( $trial_end_date ) && '0' !== $trial_end_date ) {
 			$meta_data['trial_end_date']     = get_date_from_gmt( $trial_end_date, 'Y-m-d H:i:s' );
 			$meta_data['trial_end_date_utc'] = $trial_end_date;
