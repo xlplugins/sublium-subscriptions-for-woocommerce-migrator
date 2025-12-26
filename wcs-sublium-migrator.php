@@ -203,6 +203,10 @@ class WCS_Sublium_Migrator {
 		// Initialize admin - use admin_init hook to ensure WordPress is fully loaded.
 		add_action( 'init', array( $this, 'init_admin' ) );
 
+		// Always initialize API so routes are registered even when WCS is deactivated.
+		// This allows the UI to display "WCS not installed" message.
+		WCS_Sublium_Migrator\API\Migration_API::get_instance();
+
 		// Only initialize migration features if dependencies are met.
 		if ( ! $this->is_woocommerce_active() || ! $this->is_wcs_active() || ! $this->is_sublium_active() ) {
 			return;
@@ -210,9 +214,6 @@ class WCS_Sublium_Migrator {
 
 		// Initialize migration scheduler.
 		WCS_Sublium_Migrator\Migration\Scheduler::get_instance();
-
-		// Initialize API.
-		WCS_Sublium_Migrator\API\Migration_API::get_instance();
 
 		// Initialize WCS renewal blocker (always active to prevent renewals for migrated subscriptions).
 		WCS_Sublium_Migrator\Migration\WCS_Renewal_Blocker::get_instance();

@@ -230,6 +230,17 @@ class Migration_API {
 	 * @return \WP_REST_Response
 	 */
 	public function start_products_migration( $request ) {
+		// Check if WCS is active before starting migration.
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'WooCommerce Subscriptions plugin is not active', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
 		$scheduler = \WCS_Sublium_Migrator\Migration\Scheduler::get_instance();
 		$result = $scheduler->start_products_migration();
 
@@ -247,6 +258,17 @@ class Migration_API {
 	 * @return \WP_REST_Response
 	 */
 	public function start_subscriptions_migration( $request ) {
+		// Check if WCS is active before starting migration.
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'WooCommerce Subscriptions plugin is not active', 'wcs-sublium-migrator' ),
+				),
+				400
+			);
+		}
+
 		$scheduler = \WCS_Sublium_Migrator\Migration\Scheduler::get_instance();
 		$result = $scheduler->start_subscriptions_migration();
 

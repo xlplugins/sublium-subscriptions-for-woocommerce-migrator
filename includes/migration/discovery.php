@@ -144,25 +144,63 @@ class Discovery {
 	 */
 	public function get_active_subscription_count() {
 		// Use WCS native function to get all subscriptions (including on-hold, cancelled, etc.).
-		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
-			return 0;
+		if ( function_exists( 'wcs_get_subscriptions' ) ) {
+			try {
+				// Get all subscriptions regardless of status (active, on-hold, cancelled, expired, etc.).
+				$subscriptions = wcs_get_subscriptions(
+					array(
+						'status'  => 'any', // Get all subscription statuses.
+						'limit'   => -1,
+						'return'  => 'ids',
+					)
+				);
+
+				if ( is_array( $subscriptions ) ) {
+					return count( $subscriptions );
+				}
+			} catch ( \Exception $e ) {
+				// If WCS function fails, fall through to wc_get_orders method.
+			}
 		}
 
-		try {
-			// Get all subscriptions regardless of status (active, on-hold, cancelled, expired, etc.).
-			$subscriptions = wcs_get_subscriptions(
-				array(
-					'status'  => 'any', // Get all subscription statuses.
-					'limit'   => -1,
-					'return'  => 'ids',
-				)
-			);
+		// Fallback: Use direct database query when WCS is deactivated.
+		// wc_get_orders() filters by wc_get_order_statuses() which doesn't include subscription statuses when WCS is deactivated.
+		global $wpdb;
 
-			if ( is_array( $subscriptions ) ) {
-				return count( $subscriptions );
+		try {
+			// Check if HPOS is enabled using OrderUtil helper.
+			$is_hpos_enabled = false;
+			if ( class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) && method_exists( '\Automattic\WooCommerce\Utilities\OrderUtil', 'custom_orders_table_usage_is_enabled' ) ) {
+				$is_hpos_enabled = \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+			}
+
+			if ( $is_hpos_enabled ) {
+				// HPOS enabled - query wc_orders table directly.
+				$orders_table = $wpdb->prefix . 'wc_orders';
+				$count = $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$orders_table} WHERE type = %s",
+						'shop_subscription'
+					)
+				);
+			} else {
+				// Traditional post storage - query posts table directly.
+				$count = $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = %s",
+						'shop_subscription'
+					)
+				);
+			}
+
+			if ( is_numeric( $count ) ) {
+				return absint( $count );
 			}
 		} catch ( \Exception $e ) {
-			// If WCS function fails, return 0.
+			// If database query fails, return 0.
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Failed to count subscriptions via database query: %s', $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			return 0;
 		}
 
@@ -175,44 +213,67 @@ class Discovery {
 	 * @return array Subscription counts grouped by status.
 	 */
 	public function get_subscription_counts_by_status() {
-		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
-			return array();
-		}
-
-		// Get all available WCS subscription statuses.
-		$wcs_statuses = array();
-		if ( function_exists( 'wcs_get_subscription_statuses' ) ) {
-			$wcs_statuses_raw = wcs_get_subscription_statuses();
-			// Extract status keys (remove 'wc-' prefix if present).
-			foreach ( $wcs_statuses_raw as $status_key => $status_label ) {
-				$clean_key = str_replace( 'wc-', '', $status_key );
-				$wcs_statuses[] = $clean_key;
-			}
-		} else {
-			// Fallback to common statuses if function not available.
-			$wcs_statuses = array( 'active', 'on-hold', 'cancelled', 'expired', 'pending', 'pending-cancel', 'switched' );
-		}
-
 		$status_counts = array();
 
-		// Count subscriptions for each status.
-		foreach ( $wcs_statuses as $status ) {
-			try {
-				$subscriptions = wcs_get_subscriptions(
-					array(
-						'subscription_status' => $status,
-						'limit'              => -1,
-						'return'             => 'ids',
-					)
-				);
-
-				$count = is_array( $subscriptions ) ? count( $subscriptions ) : 0;
-				if ( $count > 0 ) {
-					$status_counts[ $status ] = $count;
+		// Use WCS native function if available.
+		if ( function_exists( 'wcs_get_subscriptions' ) ) {
+			// Get all available WCS subscription statuses.
+			$wcs_statuses = array();
+			if ( function_exists( 'wcs_get_subscription_statuses' ) ) {
+				$wcs_statuses_raw = wcs_get_subscription_statuses();
+				// Extract status keys (remove 'wc-' prefix if present).
+				foreach ( $wcs_statuses_raw as $status_key => $status_label ) {
+					$clean_key = str_replace( 'wc-', '', $status_key );
+					$wcs_statuses[] = $clean_key;
 				}
-			} catch ( \Exception $e ) {
-				// Skip status if query fails.
-				continue;
+			} else {
+				// Fallback to common statuses if function not available.
+				$wcs_statuses = array( 'active', 'on-hold', 'cancelled', 'expired', 'pending', 'pending-cancel', 'switched' );
+			}
+
+			// Count subscriptions for each status.
+			foreach ( $wcs_statuses as $status ) {
+				try {
+					$subscriptions = wcs_get_subscriptions(
+						array(
+							'subscription_status' => $status,
+							'limit'              => -1,
+							'return'             => 'ids',
+						)
+					);
+
+					$count = is_array( $subscriptions ) ? count( $subscriptions ) : 0;
+					if ( $count > 0 ) {
+						$status_counts[ $status ] = $count;
+					}
+				} catch ( \Exception $e ) {
+					// Skip status if query fails.
+					continue;
+				}
+			}
+		} elseif ( function_exists( 'wc_get_orders' ) ) {
+			// Fallback: Use wc_get_orders when WCS is deactivated.
+			$common_statuses = array( 'active', 'on-hold', 'cancelled', 'expired', 'pending', 'pending-cancel', 'switched' );
+
+			foreach ( $common_statuses as $status ) {
+				try {
+					$subscriptions = wc_get_orders(
+						array(
+							'type'   => 'shop_subscription',
+							'status' => 'wc-' . $status,
+							'limit'  => -1,
+							'return' => 'ids',
+						)
+					);
+
+					$count = is_array( $subscriptions ) ? count( $subscriptions ) : 0;
+					if ( $count > 0 ) {
+						$status_counts[ $status ] = $count;
+					}
+				} catch ( \Exception $e ) {
+					// Skip status if query fails.
+					continue;
+				}
 			}
 		}
 
@@ -252,6 +313,18 @@ class Discovery {
 				}
 
 				$gateway_id = $subscription->get_payment_method();
+
+				// Fallback to parent order's payment method if subscription payment method is empty.
+				if ( empty( $gateway_id ) ) {
+					$parent_order_id = $subscription->get_parent_id();
+					if ( $parent_order_id ) {
+						$parent_order = wc_get_order( $parent_order_id );
+						if ( $parent_order instanceof \WC_Order ) {
+							$gateway_id = $parent_order->get_payment_method();
+						}
+					}
+				}
+
 				if ( empty( $gateway_id ) ) {
 					continue;
 				}

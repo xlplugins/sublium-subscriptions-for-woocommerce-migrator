@@ -415,6 +415,17 @@ class Subscriptions_Processor {
 		// Get payment gateway.
 		$gateway = $wcs_subscription->get_payment_method();
 
+		// Fallback to parent order's payment method if subscription payment method is empty.
+		if ( empty( $gateway ) ) {
+			$parent_order_id = $wcs_subscription->get_parent_id();
+			if ( $parent_order_id ) {
+				$parent_order = wc_get_order( $parent_order_id );
+				if ( $parent_order instanceof \WC_Order ) {
+					$gateway = $parent_order->get_payment_method();
+				}
+			}
+		}
+
 		// Build search string.
 		$search_str = $this->build_search_string( $wcs_subscription );
 

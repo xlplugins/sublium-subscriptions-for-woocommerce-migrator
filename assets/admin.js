@@ -244,9 +244,16 @@
 					</div>
 					` : ''}
 
-					<div class="wcs-migrator-readiness ${data.readiness.status}">
-						<strong>Status:</strong> ${data.readiness.message}
-					</div>
+					${data.readiness.status === 'blocked' && data.readiness.message.includes('not active') ? `
+						<div class="wcs-migrator-error-message" style="padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24; margin: 20px 0;">
+							<p><strong>⚠️ WooCommerce Subscriptions Plugin Not Installed</strong></p>
+							<p>WCS to Sublium Migrator requires WooCommerce Subscriptions to be installed and active.</p>
+						</div>
+					` : `
+						<div class="wcs-migrator-readiness ${data.readiness.status}">
+							<strong>Status:</strong> ${data.readiness.message}
+						</div>
+					`}
 
 					<div class="wcs-migrator-stats">
 						<div class="wcs-migrator-stat-card">
@@ -674,8 +681,11 @@
 			}
 
 			if (this.currentStep < this.totalSteps) {
-				// Disable next button during active migrations
-				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-wizard-next" ${isMigrationActive ? 'disabled' : ''}>
+				// Check if WCS plugin is not installed/active
+				const isWCSBlocked = discoveryData && discoveryData.readiness && discoveryData.readiness.status === 'blocked' && discoveryData.readiness.message && discoveryData.readiness.message.includes('not active');
+
+				// Disable next button during active migrations or if WCS is not installed
+				buttons += `<button class="wcs-migrator-button wcs-migrator-button-primary wcs-wizard-next" ${isMigrationActive || isWCSBlocked ? 'disabled' : ''}>
 					Next
 				</button>`;
 			}
@@ -1063,6 +1073,14 @@
 
 			if (this.discoveryData && this.discoveryData.readiness) {
 				const readinessStatus = this.discoveryData.readiness.status;
+				const readinessMessage = this.discoveryData.readiness.message || '';
+				const isWCSNotInstalled = readinessStatus === 'blocked' && readinessMessage.includes('not active');
+
+				// Don't show alert if WCS is not installed - UI already shows message
+				if (isWCSNotInstalled) {
+					return;
+				}
+
 				if (readinessStatus === 'partial') {
 					const incompatibleGateways = this.discoveryData.gateways.filter(g => !g.compatible);
 					let warningMessage = '⚠️ WARNING: Some payment gateways are not compatible with Sublium.\n\n';
@@ -1077,7 +1095,7 @@
 						return;
 					}
 				} else if (readinessStatus === 'blocked') {
-					alert('Migration is blocked. Please resolve the issues before proceeding.');
+					// Don't show alert - UI already displays the message
 					return;
 				}
 			}
