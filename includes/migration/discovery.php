@@ -138,6 +138,40 @@ class Discovery {
 	}
 
 	/**
+	 * Get count of actually migrated subscriptions (those with _sublium_wcs_subscription_id meta).
+	 *
+	 * @return int Number of migrated subscriptions.
+	 */
+	public function get_migrated_subscription_count() {
+		if ( ! function_exists( 'wcs_get_subscriptions' ) ) {
+			return 0;
+		}
+
+		try {
+			// Get subscriptions that have been migrated (have _sublium_subscription_migrated meta).
+			// Use only _sublium_subscription_migrated to avoid conflicts.
+			$migrated_subscriptions = wcs_get_subscriptions(
+				array(
+					'status'     => 'any',
+					'limit'      => -1,
+					'return'     => 'ids',
+					'meta_query' => array(
+						array(
+							'key'     => '_sublium_subscription_migrated',
+							'value'   => 'yes',
+							'compare' => '=',
+						),
+					),
+				)
+			);
+
+			return is_array( $migrated_subscriptions ) ? count( $migrated_subscriptions ) : 0;
+		} catch ( \Exception $e ) {
+			return 0;
+		}
+	}
+
+	/**
 	 * Get subscription count (all statuses).
 	 *
 	 * @return int Number of subscriptions (including active, on-hold, cancelled, expired, etc.).
@@ -544,6 +578,7 @@ class Discovery {
 	public function get_feasibility_data() {
 		$wcs_status = $this->check_wcs_plugin();
 		$active_subscriptions = $this->get_active_subscription_count();
+		$migrated_subscriptions = $this->get_migrated_subscription_count();
 		$subscription_statuses = $this->get_subscription_counts_by_status();
 		$gateways = $this->discover_payment_gateways();
 		$products = $this->get_subscription_products_summary();
@@ -552,12 +587,13 @@ class Discovery {
 		$readiness = $this->calculate_readiness( $wcs_status, $gateways, $products, $active_subscriptions );
 
 		return array(
-			'wcs_status'           => $wcs_status,
-			'active_subscriptions' => $active_subscriptions,
+			'wcs_status'            => $wcs_status,
+			'active_subscriptions'   => $active_subscriptions,
+			'migrated_subscriptions' => $migrated_subscriptions,
 			'subscription_statuses' => $subscription_statuses,
-			'gateways'             => $gateways,
-			'products'             => $products,
-			'readiness'            => $readiness,
+			'gateways'               => $gateways,
+			'products'               => $products,
+			'readiness'              => $readiness,
 		);
 	}
 

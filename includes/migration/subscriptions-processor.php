@@ -38,6 +38,11 @@ class Subscriptions_Processor {
 		$state         = new State();
 		$current_state = $state->get_state();
 
+		// Get the last processed subscription ID to avoid reprocessing.
+		// Since we recalculate unmigrated subscriptions each time, we need to track
+		// which ones we've already processed in this run.
+		$last_processed_id = absint( $current_state['subscriptions_migration']['last_subscription_id'] ?? 0 );
+
 
 		// Check if paused.
 		if ( 'paused' === $current_state['status'] ) {
@@ -54,13 +59,19 @@ class Subscriptions_Processor {
 		$created       = 0;
 		$failed        = 0;
 
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: process_batch - offset=%d, batch_size=%d, found=%d subscriptions', $offset, $this->batch_size, count( $subscriptions ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
 		foreach ( $subscriptions as $wcs_subscription ) {
 			try {
 				$subscription_id = is_a( $wcs_subscription, 'WC_Subscription' ) ? $wcs_subscription->get_id() : 0;
 
 				// Check gateway support before migration.
+				// Map gateway ID first, then check support (so PayPal gateways map to fkwcppcp_paypal).
 				$gateway = $wcs_subscription->get_payment_method();
-				if ( ! empty( $gateway ) && ! $this->is_gateway_supported_by_sublium( $gateway ) ) {
+				$mapped_gateway = $this->map_gateway_id_for_sublium( $gateway );
+				if ( ! empty( $mapped_gateway ) && ! $this->is_gateway_supported_by_sublium( $mapped_gateway ) ) {
 					$gateway_title = $wcs_subscription->get_payment_method_title();
 					$warning_message = sprintf(
 						/* translators: 1: Subscription ID, 2: Gateway ID, 3: Gateway Title */
@@ -81,7 +92,13 @@ class Subscriptions_Processor {
 				}
 
 				// Check if subscription was already migrated before calling migrate_subscription.
-				$was_already_migrated = ! empty( $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true ) );
+				// Use only _sublium_subscription_migrated to avoid conflicts.
+				$is_migrated_flag = $wcs_subscription->get_meta( '_sublium_subscription_migrated', true );
+				$was_already_migrated = 'yes' === $is_migrated_flag;
+
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Processing subscription %d, was_already_migrated=%s', $subscription_id, $was_already_migrated ? 'yes' : 'no' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
 
 				$result = $this->migrate_subscription( $wcs_subscription );
 				if ( $result ) {
@@ -89,15 +106,24 @@ class Subscriptions_Processor {
 					if ( $was_already_migrated ) {
 						// Already migrated - count as processed but not created.
 						++$processed;
+						if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+							error_log( sprintf( 'WCS Migrator: Subscription %d was already migrated (Sublium ID: %d), counted as processed only', $subscription_id, $result ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+						}
 					} else {
 						// Newly migrated - count as both processed and created.
 						++$created;
 						++$processed;
+						if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+							error_log( sprintf( 'WCS Migrator: Successfully migrated subscription %d to Sublium (ID: %d)', $subscription_id, $result ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+						}
 					}
 				} else {
 					// Migration failed - count as processed and failed.
 					++$failed;
 					++$processed;
+					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+						error_log( sprintf( 'WCS Migrator: Failed to migrate subscription %d', $subscription_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					}
 					$state->add_error(
 						sprintf( 'Failed to migrate subscription %d', $subscription_id ),
 						array( 'subscription_id' => $subscription_id )
@@ -149,7 +175,9 @@ class Subscriptions_Processor {
 		}
 
 		// Check if more subscriptions exist.
-		$has_more    = count( $subscriptions ) === $this->batch_size;
+		// Since we filter by last_processed_id and recalculate unmigrated subscriptions each time,
+		// if we got a full batch, there might be more. If we got less than a full batch, we're done.
+		$has_more = count( $subscriptions ) === $this->batch_size;
 		$next_offset = $has_more ? $offset + $this->batch_size : 0;
 
 		return array(
@@ -175,43 +203,138 @@ class Subscriptions_Processor {
 			return array();
 		}
 
-		// Only fetch subscriptions that haven't been migrated yet.
-		// Exclude subscriptions that have _sublium_wcs_subscription_id meta key.
-		$subscriptions = wcs_get_subscriptions(
+		// Clear relevant caches to ensure we get fresh subscription data.
+		wp_cache_delete( 'wcs_subscriptions', 'woocommerce' );
+
+		// Get all subscription IDs first, then get migrated IDs, then calculate unmigrated.
+		// This approach is more reliable than using meta_query with NOT EXISTS.
+		$all_subscriptions = wcs_get_subscriptions(
 			array(
-				'status'     => 'any', // Migrate all subscriptions including on-hold, cancelled, expired, etc.
-				'limit'      => $limit,
-				'offset'     => $offset,
-				'orderby'    => 'ID',
-				'order'      => 'ASC',
+				'status' => 'any',
+				'limit'  => -1,
+				'return' => 'ids',
+			)
+		);
+
+		if ( empty( $all_subscriptions ) || ! is_array( $all_subscriptions ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WCS Migrator: get_subscriptions_batch - No subscriptions found at all' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return array();
+		}
+
+		// Extract IDs from results (handle both IDs and objects).
+		$all_ids = array();
+		foreach ( $all_subscriptions as $item ) {
+			if ( is_numeric( $item ) ) {
+				$all_ids[] = absint( $item );
+			} elseif ( is_a( $item, 'WC_Subscription' ) ) {
+				$all_ids[] = absint( $item->get_id() );
+			} elseif ( is_object( $item ) && isset( $item->ID ) ) {
+				$all_ids[] = absint( $item->ID );
+			}
+		}
+
+		// Get migrated subscription IDs (those with _sublium_subscription_migrated meta).
+		// Use only _sublium_subscription_migrated to avoid conflicts.
+		$migrated_subscriptions = wcs_get_subscriptions(
+			array(
+				'status'     => 'any',
+				'limit'      => -1,
 				'return'     => 'ids',
 				'meta_query' => array(
-					'relation' => 'OR',
 					array(
-						'key'     => '_sublium_wcs_subscription_id',
-						'compare' => 'NOT EXISTS',
-					),
-					array(
-						'key'     => '_sublium_wcs_subscription_id',
-						'value'   => '',
+						'key'     => '_sublium_subscription_migrated',
+						'value'   => 'yes',
 						'compare' => '=',
 					),
 				),
 			)
 		);
 
-		if ( empty( $subscriptions ) || ! is_array( $subscriptions ) ) {
+		// Extract IDs from migrated results (handle both IDs and objects).
+		$migrated_ids = array();
+		if ( is_array( $migrated_subscriptions ) ) {
+			foreach ( $migrated_subscriptions as $item ) {
+				if ( is_numeric( $item ) ) {
+					$migrated_ids[] = absint( $item );
+				} elseif ( is_a( $item, 'WC_Subscription' ) ) {
+					$migrated_ids[] = absint( $item->get_id() );
+				} elseif ( is_object( $item ) && isset( $item->ID ) ) {
+					$migrated_ids[] = absint( $item->ID );
+				}
+			}
+		}
+
+		// Calculate unmigrated subscription IDs: all - migrated.
+		$unmigrated_ids = array_diff( $all_ids, $migrated_ids );
+		$unmigrated_ids = array_values( $unmigrated_ids ); // Re-index array.
+
+		// Sort unmigrated IDs to ensure consistent ordering.
+		sort( $unmigrated_ids );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: get_subscriptions_batch - Total=%d, Migrated=%d, Unmigrated=%d, offset=%d', count( $all_ids ), count( $migrated_ids ), count( $unmigrated_ids ), $offset ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		// Filter out subscriptions that have already been processed in this migration run.
+		// We use the last_processed_id to avoid reprocessing subscriptions.
+		// Get the last processed ID from state.
+		$state = new State();
+		$current_state = $state->get_state();
+		$last_processed_id = absint( $current_state['subscriptions_migration']['last_subscription_id'] ?? 0 );
+
+		// Filter unmigrated IDs to only include those with ID > last_processed_id.
+		// This ensures we process subscriptions in order and don't reprocess.
+		if ( $last_processed_id > 0 ) {
+			$unmigrated_ids = array_filter( $unmigrated_ids, function( $id ) use ( $last_processed_id ) {
+				return absint( $id ) > $last_processed_id;
+			} );
+			$unmigrated_ids = array_values( $unmigrated_ids ); // Re-index.
+		}
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: get_subscriptions_batch - After filtering (last_processed_id=%d), Unmigrated=%d', $last_processed_id, count( $unmigrated_ids ) ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		// If no unmigrated subscriptions remain, return empty.
+		if ( empty( $unmigrated_ids ) ) {
+			return array();
+		}
+
+		// Get the first batch_size unmigrated subscriptions (sorted by ID).
+		$subscription_ids = array_slice( $unmigrated_ids, 0, $limit );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$subscription_ids_str = ! empty( $subscription_ids ) ? implode( ', ', $subscription_ids ) : 'none';
+			error_log( sprintf( 'WCS Migrator: get_subscriptions_batch - offset=%d, limit=%d, found=%d subscriptions, IDs: %s', $offset, $limit, count( $subscription_ids ), $subscription_ids_str ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		if ( empty( $subscription_ids ) || ! is_array( $subscription_ids ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WCS Migrator: get_subscriptions_batch - No subscriptions found, returning empty array' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 			return array();
 		}
 
 		// Convert IDs to subscription objects.
-		// Note: We return all subscriptions here, even if already migrated.
-		// The processing loop will count them as "processed" even if skipped.
 		$subscription_objects = array();
-		foreach ( $subscriptions as $subscription_id ) {
+		foreach ( $subscription_ids as $subscription_id ) {
 			$subscription = wcs_get_subscription( $subscription_id );
 			if ( $subscription && is_a( $subscription, 'WC_Subscription' ) ) {
-				$subscription_objects[] = $subscription;
+				// Double-check that this subscription is actually unmigrated.
+				// Use only _sublium_subscription_migrated to avoid conflicts.
+				$is_migrated_flag = $subscription->get_meta( '_sublium_subscription_migrated', true );
+				$is_migrated = 'yes' === $is_migrated_flag;
+
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Subscription %d - migrated_flag=%s, is_migrated=%s', $subscription_id, $is_migrated_flag ? $is_migrated_flag : 'none', $is_migrated ? 'yes' : 'no' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+
+				// Only add if not migrated.
+				if ( ! $is_migrated ) {
+					$subscription_objects[] = $subscription;
+				}
 			}
 		}
 
@@ -236,10 +359,15 @@ class Subscriptions_Processor {
 		}
 
 		// Check if subscription already migrated (meta check to prevent duplicates).
-		$existing_sublium_id = $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true );
-		if ( ! empty( $existing_sublium_id ) ) {
+		// Use only _sublium_subscription_migrated to avoid conflicts.
+		$is_migrated_flag = $wcs_subscription->get_meta( '_sublium_subscription_migrated', true );
+
+		if ( 'yes' === $is_migrated_flag ) {
+			// Get the Sublium subscription ID for verification.
+			$existing_sublium_id = $wcs_subscription->get_meta( '_sublium_wcs_subscription_id', true );
+
 			// Verify the Sublium subscription still exists.
-			if ( function_exists( 'sublium_get_subscription' ) ) {
+			if ( ! empty( $existing_sublium_id ) && function_exists( 'sublium_get_subscription' ) ) {
 				$sublium_subscription = sublium_get_subscription( $existing_sublium_id );
 				if ( $sublium_subscription && $sublium_subscription->exists ) {
 					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -247,9 +375,16 @@ class Subscriptions_Processor {
 					}
 					return absint( $existing_sublium_id );
 				}
-			} else {
-				// If function doesn't exist, assume it's migrated to avoid duplicates.
+			} elseif ( ! empty( $existing_sublium_id ) ) {
+				// If function doesn't exist but we have the ID, assume it's migrated to avoid duplicates.
 				return absint( $existing_sublium_id );
+			} else {
+				// Migration flag is set but no Sublium ID - subscription was marked as migrated but link is missing.
+				// Still return false to allow re-migration to fix the link.
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf( 'WCS Migrator: Subscription %d marked as migrated but no Sublium ID found, allowing re-migration', $subscription_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				}
+				return false;
 			}
 		}
 
@@ -296,6 +431,9 @@ class Subscriptions_Processor {
 
 		// Add subscription items.
 		$this->add_subscription_items( $sublium_subscription, $wcs_subscription );
+
+		// Copy Payment Plugins PayPal billing agreement ID to FunnelKit PayPal subscription ID.
+		$this->copy_payment_plugins_paypal_billing_agreement( $wcs_subscription, $sublium_subscription );
 
 		// Link WCS subscription to Sublium subscription.
 		$wcs_subscription->update_meta_data( '_sublium_wcs_subscription_id', $sublium_subscription_id );
@@ -425,6 +563,10 @@ class Subscriptions_Processor {
 				}
 			}
 		}
+
+		// Map FunnelKit PayPal gateway IDs to standard PayPal gateway ID.
+		// FunnelKit PayPal powers the payment but Sublium expects standard PayPal gateway ID.
+		$gateway = $this->map_gateway_id_for_sublium( $gateway );
 
 		// Build search string.
 		$search_str = $this->build_search_string( $wcs_subscription );
@@ -1097,6 +1239,47 @@ class Subscriptions_Processor {
 	}
 
 	/**
+	 * Map gateway ID for Sublium compatibility.
+	 * Maps all PayPal gateway IDs to FunnelKit PayPal gateway ID (fkwcppcp_paypal).
+	 *
+	 * @param string $gateway_id Original gateway ID.
+	 * @return string Mapped gateway ID.
+	 */
+	private function map_gateway_id_for_sublium( $gateway_id ) {
+		if ( empty( $gateway_id ) ) {
+			return $gateway_id;
+		}
+
+		// Map all PayPal gateway IDs to FunnelKit PayPal gateway ID.
+		// FunnelKit PayPal powers the payment, so use fkwcppcp_paypal as the gateway ID.
+		$paypal_gateways = array(
+			'paypal',             // Standard PayPal gateway.
+			'ppcp',               // PayPal Commerce Platform (PPCP).
+			'ppcp-gateway',       // Alternative PPCP gateway ID.
+			'paypal_standard',    // PayPal Standard gateway.
+			'paypal_express',     // PayPal Express gateway.
+			'angelleye_ppcp',     // Angelleye PayPal Commerce Platform.
+			'ppec_paypal',        // PayPal Express Checkout.
+			'fkpy_paypal',        // FunnelKit PayPal (alternative ID).
+		);
+
+		if ( in_array( $gateway_id, $paypal_gateways, true ) ) {
+			// Map to FunnelKit PayPal gateway ID.
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Mapping PayPal gateway "%s" to "fkwcppcp_paypal" for Sublium compatibility', $gateway_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return 'fkwcppcp_paypal';
+		}
+
+		// Keep fkwcppcp_paypal as is (no mapping needed).
+		if ( 'fkwcppcp_paypal' === $gateway_id ) {
+			return $gateway_id;
+		}
+
+		return $gateway_id;
+	}
+
+	/**
 	 * Check if gateway is supported by Sublium.
 	 *
 	 * @param string $gateway_id Gateway ID.
@@ -1107,16 +1290,19 @@ class Subscriptions_Processor {
 			return true; // Empty gateway means manual renewal, which is supported.
 		}
 
+		// Map gateway ID first (e.g., FunnelKit PayPal to PayPal).
+		$mapped_gateway_id = $this->map_gateway_id_for_sublium( $gateway_id );
+
 		// Manual payment gateways are always supported.
 		$manual_gateways = array( 'bacs', 'cheque', 'cod', 'manual' );
-		if ( in_array( $gateway_id, $manual_gateways, true ) ) {
+		if ( in_array( $mapped_gateway_id, $manual_gateways, true ) ) {
 			return true;
 		}
 
 		// Get supported gateways from Sublium using static method.
 		if ( class_exists( '\Sublium_WCS\Includes\Abstracts\Payment_Gateway' ) ) {
 			$supported_gateways = \Sublium_WCS\Includes\Abstracts\Payment_Gateway::get_supported_gateways();
-			if ( is_array( $supported_gateways ) && array_key_exists( $gateway_id, $supported_gateways ) ) {
+			if ( is_array( $supported_gateways ) && array_key_exists( $mapped_gateway_id, $supported_gateways ) ) {
 				return true;
 			}
 		}
@@ -1125,7 +1311,7 @@ class Subscriptions_Processor {
 		if ( class_exists( '\Sublium_WCS\Includes\Main\Gateways' ) ) {
 			$gateways_instance = \Sublium_WCS\Includes\Main\Gateways::get_instance();
 			if ( method_exists( $gateways_instance, 'get_gateway' ) ) {
-				$gateway_instance = $gateways_instance->get_gateway( $gateway_id );
+				$gateway_instance = $gateways_instance->get_gateway( $mapped_gateway_id );
 				return ! empty( $gateway_instance );
 			}
 		}
@@ -1357,6 +1543,64 @@ class Subscriptions_Processor {
 			return __( 'Billed {{subscription_price}} with a one-time {{signup_fee}} signup fee.', 'wcs-sublium-migrator' );
 		} else {
 			return __( 'Billed {{subscription_price}}.', 'wcs-sublium-migrator' );
+		}
+	}
+
+	/**
+	 * Copy Payment Plugins PayPal billing agreement ID to FunnelKit PayPal subscription ID.
+	 *
+	 * For Payment Plugins PayPal subscriptions, copy the billing agreement ID to
+	 * _fkwcppcp_subscription_id in both WCS subscription and Sublium subscription
+	 * to ensure webhook handlers can find the subscription.
+	 *
+	 * @param \WC_Subscription                                    $wcs_subscription WooCommerce Subscription object.
+	 * @param \Sublium_WCS\Includes\Controller\Subscriptions\Subscription $sublium_subscription Sublium Subscription object.
+	 * @return void
+	 */
+	private function copy_payment_plugins_paypal_billing_agreement( $wcs_subscription, $sublium_subscription ) {
+		// Check if this is a Payment Plugins PayPal subscription.
+		$payment_method = $wcs_subscription->get_payment_method();
+
+		// Payment Plugins PayPal gateway IDs.
+		$ppcp_gateway_ids = array( 'ppcp', 'ppcp-gateway' );
+
+		if ( ! in_array( $payment_method, $ppcp_gateway_ids, true ) ) {
+			return;
+		}
+
+		// Get billing agreement ID from WCS subscription.
+		// Payment Plugins uses Constants::BILLING_AGREEMENT_ID which is typically '_billing_agreement_id'.
+		$billing_agreement_id = $wcs_subscription->get_meta( '_billing_agreement_id', true );
+
+		// Also check for the constant if Payment Plugins class exists.
+		if ( empty( $billing_agreement_id ) && class_exists( '\PaymentPlugins\WooCommerce\PPCP\Constants' ) ) {
+			$billing_agreement_id = $wcs_subscription->get_meta( \PaymentPlugins\WooCommerce\PPCP\Constants::BILLING_AGREEMENT_ID, true );
+		}
+
+		// If no billing agreement ID found, try parent order.
+		if ( empty( $billing_agreement_id ) ) {
+			$parent_order = $wcs_subscription->get_parent();
+			if ( $parent_order instanceof \WC_Order ) {
+				$billing_agreement_id = $parent_order->get_meta( '_billing_agreement_id', true );
+
+				if ( empty( $billing_agreement_id ) && class_exists( '\PaymentPlugins\WooCommerce\PPCP\Constants' ) ) {
+					$billing_agreement_id = $parent_order->get_meta( \PaymentPlugins\WooCommerce\PPCP\Constants::BILLING_AGREEMENT_ID, true );
+				}
+			}
+		}
+
+		// If billing agreement ID found, copy it to _fkwcppcp_subscription_id.
+		if ( ! empty( $billing_agreement_id ) ) {
+			// Copy to WCS subscription.
+			$wcs_subscription->update_meta_data( '_fkwcppcp_subscription_id', $billing_agreement_id );
+
+			// Copy to Sublium subscription.
+			$sublium_subscription->update( '_fkwcppcp_subscription_id', $billing_agreement_id );
+			$sublium_subscription->save();
+
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Copied billing agreement ID %s to _fkwcppcp_subscription_id for subscription #%d (Sublium ID: %d)', $billing_agreement_id, $wcs_subscription->get_id(), $sublium_subscription->get_id() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		}
 	}
 }

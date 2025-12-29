@@ -169,68 +169,108 @@ class Scheduler {
 
 		// Check if subscriptions migration already completed.
 		// Only check if total_subscriptions > 0 (migration was actually started before).
+		$is_completed = false;
 		if ( isset( $current_state['subscriptions_migration']['processed_subscriptions'] ) &&
 			 isset( $current_state['subscriptions_migration']['total_subscriptions'] ) &&
 			 absint( $current_state['subscriptions_migration']['total_subscriptions'] ) > 0 &&
 			 absint( $current_state['subscriptions_migration']['processed_subscriptions'] ) >= absint( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
-			return array(
-				'success' => false,
-				'message' => __( 'Subscriptions migration is already completed', 'wcs-sublium-migrator' ),
-			);
+			$is_completed = true;
 		}
 
 		// Note: Products migration check removed - subscriptions migration can run independently.
 
-		// Run discovery if not already done.
-		if ( empty( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
-			$discovery = new Discovery();
-			$feasibility = $discovery->get_feasibility_data();
+		// Always check for unmigrated subscriptions, even if migration was completed before.
+		// This allows migrating new subscriptions created after initial migration.
+		// Use discovery to get accurate counts.
+		$discovery = new Discovery();
+		$feasibility = $discovery->get_feasibility_data();
+		$active_subscriptions = absint( $feasibility['active_subscriptions'] ?? 0 );
+		$migrated_subscriptions = absint( $feasibility['migrated_subscriptions'] ?? 0 );
+		$unmigrated_count = max( 0, $active_subscriptions - $migrated_subscriptions );
 
-			// Check readiness.
-			if ( 'blocked' === $feasibility['readiness']['status'] ) {
-				return array(
-					'success' => false,
-					'message' => $feasibility['readiness']['message'],
-				);
-			}
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: start_subscriptions_migration - active=%d, migrated=%d, unmigrated=%d', $active_subscriptions, $migrated_subscriptions, $unmigrated_count ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 
-			// Count only unmigrated subscriptions (exclude those with _sublium_wcs_subscription_id meta).
-			// This ensures total_subscriptions matches what get_subscriptions_batch() will actually process.
-			$unmigrated_count = 0;
-			if ( function_exists( 'wcs_get_subscriptions' ) ) {
-				$unmigrated_subscriptions = wcs_get_subscriptions(
-					array(
-						'status'     => 'any',
-						'limit'      => -1,
-						'return'     => 'ids',
-						'meta_query' => array(
-							'relation' => 'OR',
-							array(
-								'key'     => '_sublium_wcs_subscription_id',
-								'compare' => 'NOT EXISTS',
-							),
-							array(
-								'key'     => '_sublium_wcs_subscription_id',
-								'value'   => '',
-								'compare' => '=',
-							),
+		// Also get the actual unmigrated subscription IDs for logging.
+		if ( function_exists( 'wcs_get_subscriptions' ) && $unmigrated_count > 0 ) {
+			// Clear cache to ensure fresh data.
+			wp_cache_delete( 'wcs_subscriptions', 'woocommerce' );
+
+			$unmigrated_subscriptions = wcs_get_subscriptions(
+				array(
+					'status'     => 'any',
+					'limit'      => -1,
+					'return'     => 'ids',
+					'meta_query' => array(
+						'relation' => 'OR',
+						array(
+							'key'     => '_sublium_wcs_subscription_id',
+							'compare' => 'NOT EXISTS',
 						),
-					)
-				);
-				$unmigrated_count = is_array( $unmigrated_subscriptions ) ? count( $unmigrated_subscriptions ) : 0;
-			}
+						array(
+							'key'     => '_sublium_wcs_subscription_id',
+							'value'   => '',
+							'compare' => '=',
+						),
+					),
+				)
+			);
 
-			// Initialize state with counts (only unmigrated subscriptions).
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				$unmigrated_ids_str = is_array( $unmigrated_subscriptions ) && ! empty( $unmigrated_subscriptions ) ? implode( ', ', array_slice( $unmigrated_subscriptions, 0, 10 ) ) : 'none';
+				$query_count = is_array( $unmigrated_subscriptions ) ? count( $unmigrated_subscriptions ) : 0;
+				error_log( sprintf( 'WCS Migrator: Query found %d unmigrated subscriptions, IDs (first 10): %s', $query_count, $unmigrated_ids_str ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+		}
+
+		// If migration was completed but there are unmigrated subscriptions, allow restarting.
+		if ( $is_completed && $unmigrated_count > 0 ) {
+			// Update total to reflect current unmigrated subscriptions only.
+			// Since we're querying only unmigrated subscriptions, the total should be the unmigrated count.
+			$current_state['subscriptions_migration']['total_subscriptions'] = $unmigrated_count;
+			// Reset processed count to 0 since we're starting fresh with only unmigrated subscriptions.
+			// The offset will be 0, so we'll start from the beginning of the unmigrated subscriptions list.
+			$current_state['subscriptions_migration']['processed_subscriptions'] = 0;
+			// Keep created_subscriptions count (don't reset it - it represents total ever created).
+			// Reset failed count for the new batch.
+			$current_state['subscriptions_migration']['failed_subscriptions'] = 0;
+		} elseif ( $is_completed && 0 === $unmigrated_count ) {
+			// Migration completed and no unmigrated subscriptions - block restart.
+			return array(
+				'success' => false,
+				'message' => __( 'Subscriptions migration is already completed and all subscriptions are migrated', 'wcs-sublium-migrator' ),
+			);
+		}
+
+		// Check readiness using discovery data we already fetched.
+		if ( 'blocked' === $feasibility['readiness']['status'] ) {
+			return array(
+				'success' => false,
+				'message' => $feasibility['readiness']['message'],
+			);
+		}
+
+		// Initialize state with counts if not already set.
+		if ( empty( $current_state['subscriptions_migration']['total_subscriptions'] ) ) {
+			// Use the unmigrated_count we already calculated above.
 			$current_state['subscriptions_migration']['total_subscriptions'] = $unmigrated_count;
 			if ( empty( $current_state['start_time'] ) ) {
 				$current_state['start_time'] = current_time( 'mysql' );
 			}
 		}
 
-		// Reset subscriptions migration progress if starting fresh.
+		// Reset subscriptions migration progress if starting fresh (but preserve created_subscriptions if restarting).
+		// Only reset created_subscriptions if it's truly a fresh start (no previous migration).
+		$has_previous_migration = ! empty( $current_state['subscriptions_migration']['created_subscriptions'] ) &&
+		                           absint( $current_state['subscriptions_migration']['created_subscriptions'] ) > 0;
+
 		if ( empty( $current_state['subscriptions_migration']['processed_subscriptions'] ) ) {
 			$current_state['subscriptions_migration']['processed_subscriptions'] = 0;
-			$current_state['subscriptions_migration']['created_subscriptions'] = 0;
+			// Only reset created_subscriptions if this is a truly fresh start (no previous migration).
+			if ( ! $has_previous_migration ) {
+				$current_state['subscriptions_migration']['created_subscriptions'] = 0;
+			}
 			$current_state['subscriptions_migration']['failed_subscriptions'] = 0;
 		}
 
@@ -239,7 +279,19 @@ class Scheduler {
 
 		// Schedule first subscriptions batch.
 		$offset = absint( $current_state['subscriptions_migration']['processed_subscriptions'] ?? 0 );
-		$this->schedule_subscriptions_batch( $offset );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( 'WCS Migrator: Starting subscriptions migration - offset=%d, total=%d, unmigrated=%d, created=%d', $offset, $current_state['subscriptions_migration']['total_subscriptions'], $unmigrated_count, $current_state['subscriptions_migration']['created_subscriptions'] ?? 0 ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		// If restarting with a small number of unmigrated subscriptions, process immediately.
+		// Otherwise schedule for background processing.
+		if ( $is_completed && $unmigrated_count > 0 && $unmigrated_count <= 10 ) {
+			// Process immediately for small batches when restarting.
+			$this->process_subscriptions_batch( $offset );
+		} else {
+			$this->schedule_subscriptions_batch( $offset );
+		}
 
 		return array(
 			'success' => true,

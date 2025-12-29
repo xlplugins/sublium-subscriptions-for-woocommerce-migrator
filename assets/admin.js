@@ -332,7 +332,10 @@
 			const subscriptionsMigration = statusData.subscriptions_migration || {};
 			const totalSubscriptions = parseInt(subscriptionsMigration.total_subscriptions || 0, 10);
 			const processedSubscriptions = parseInt(subscriptionsMigration.processed_subscriptions || 0, 10);
+			const createdSubscriptions = parseInt(subscriptionsMigration.created_subscriptions || 0, 10);
 			const activeSubscriptions = parseInt(data.active_subscriptions || 0, 10);
+			// Use actual migrated count from discovery (more accurate than state)
+			const actualMigratedCount = parseInt(data.migrated_subscriptions || createdSubscriptions || 0, 10);
 
 			// Check if all subscriptions are migrated
 			// If total_subscriptions is 0 but we have active subscriptions, check if they're all migrated
@@ -341,6 +344,12 @@
 			const allMigrated = activeSubscriptions > 0 && totalSubscriptions === 0 && processedSubscriptions === 0;
 			const isInProgress = statusData.status === 'subscriptions_migrating';
 			const isPaused = statusData.status === 'paused';
+
+			// Calculate unmigrated count: active subscriptions minus actually migrated subscriptions
+			// Use actualMigratedCount from discovery which counts subscriptions with _sublium_wcs_subscription_id meta
+			const unmigratedCount = Math.max(0, activeSubscriptions - actualMigratedCount);
+			// Show warning if migration completed but there are unmigrated subscriptions, OR if no migration started but subscriptions exist
+			const hasNewUnmigratedSubscriptions = ((isCompleted || allMigrated) && unmigratedCount > 0) || (actualMigratedCount === 0 && activeSubscriptions > 0);
 
 			return `
 				<div class="wcs-wizard-step-content">
@@ -387,11 +396,24 @@
 						</div>
 					` : ''}
 
-					${isCompleted || allMigrated ? `
+					${(isCompleted || allMigrated) && actualMigratedCount > 0 ? `
 						<div class="wcs-migrator-success-message" style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; margin: 20px 0;">
 							<p><strong>✓ WCS Subscriptions Migrated</strong></p>
-							<p>All ${activeSubscriptions || processedSubscriptions} subscriptions have been migrated to Sublium.</p>
-							${subscriptionsMigration.created_subscriptions ? `<p>${subscriptionsMigration.created_subscriptions} subscriptions were created during migration.</p>` : ''}
+							<p>All ${actualMigratedCount} subscriptions have been migrated to Sublium.</p>
+							${createdSubscriptions > 0 ? `<p>${createdSubscriptions} subscriptions were created during migration.</p>` : ''}
+						</div>
+					` : ''}
+
+					${hasNewUnmigratedSubscriptions ? `
+						<div class="wcs-wizard-info-box" style="padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404; margin: 20px 0;">
+							<p><strong>⚠️ ${actualMigratedCount > 0 ? 'New Subscriptions Detected' : 'Subscriptions Need Migration'}</strong></p>
+							<p>There ${unmigratedCount === 1 ? 'is' : 'are'} ${unmigratedCount} unmigrated subscription(s)${actualMigratedCount > 0 ? ' that were created after the initial migration' : ''}.</p>
+							${actualMigratedCount > 0 ? `<p>${actualMigratedCount} subscription(s) have already been migrated.</p>` : ''}
+							<p style="margin-top: 10px;">
+								<button type="button" class="wcs-migrator-button wcs-migrator-button-primary wcs-migrator-start-subscriptions" style="margin-right: 10px;">
+									${actualMigratedCount > 0 ? 'Migrate Remaining Subscriptions' : 'Start Migration'}
+								</button>
+							</p>
 						</div>
 					` : ''}
 
