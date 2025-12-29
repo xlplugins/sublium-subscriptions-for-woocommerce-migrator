@@ -73,7 +73,7 @@ class WCS_Renewal_Blocker {
 		// Add admin notices and UI modifications.
 		add_action( 'admin_notices', array( $this, 'add_migration_notice' ) );
 		add_action( 'admin_footer', array( $this, 'hide_renewal_buttons' ) );
-		add_filter( 'wcs_get_subscription', array( $this, 'prevent_subscription_loading' ), 10, 2 );
+		//add_filter( 'wcs_get_subscription', array( $this, 'prevent_subscription_loading' ), 10, 2 );
 	}
 	/**
 	 * Prevent subscription from being loaded during scheduled renewal actions.
