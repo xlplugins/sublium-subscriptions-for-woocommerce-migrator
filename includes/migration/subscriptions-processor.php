@@ -1286,6 +1286,20 @@ class Subscriptions_Processor {
 			return 'fkwcppcp_paypal';
 		}
 
+		// Map all Square gateway IDs to FunnelKit Square gateway ID.
+		// FunnelKit Square powers the payment, so use fkwcsq_square as the gateway ID.
+		$square_gateways = array(
+			'square_credit_card',   // WooCommerce Square Credit Card gateway.
+		);
+
+		if ( in_array( $gateway_id, $square_gateways, true ) ) {
+			// Map to FunnelKit Square gateway ID.
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Mapping Square gateway "%s" to "fkwcsq_square" for Sublium compatibility', $gateway_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return 'fkwcsq_square';
+		}
+
 		// Keep FunnelKit gateway IDs as is (no mapping needed).
 		if ( in_array( $gateway_id, array( 'fkwcppcp_paypal', 'fkwcs_stripe', 'fkwcsq_square' ), true ) ) {
 			return $gateway_id;
