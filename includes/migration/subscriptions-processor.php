@@ -1274,8 +1274,8 @@ class Subscriptions_Processor {
 			'paypal_standard',    // PayPal Standard gateway.
 			'paypal_express',     // PayPal Express gateway.
 			'angelleye_ppcp',     // Angelleye PayPal Commerce Platform.
-			'ppec_paypal',        // PayPal Express Checkout.
-			'fkpy_paypal',        // FunnelKit PayPal (alternative ID).
+			'ppec_paypal',        // PayPal Express Checkout (standard ID).
+			'ppec',               // PayPal Express Checkout (alternative ID).
 		);
 
 		if ( in_array( $gateway_id, $paypal_gateways, true ) ) {
