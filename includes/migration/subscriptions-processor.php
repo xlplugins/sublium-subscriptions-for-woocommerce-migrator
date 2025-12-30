@@ -1250,6 +1250,21 @@ class Subscriptions_Processor {
 			return $gateway_id;
 		}
 
+		// Map all Stripe gateway IDs to FunnelKit Stripe gateway ID.
+		// FunnelKit Stripe powers the payment, so use fkwcs_stripe as the gateway ID.
+		$stripe_gateways = array(
+			'stripe',             // Standard Stripe gateway.
+			'stripe_cc',          // Stripe Credit Card gateway.
+		);
+
+		if ( in_array( $gateway_id, $stripe_gateways, true ) ) {
+			// Map to FunnelKit Stripe gateway ID.
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( sprintf( 'WCS Migrator: Mapping Stripe gateway "%s" to "fkwcs_stripe" for Sublium compatibility', $gateway_id ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+			return 'fkwcs_stripe';
+		}
+
 		// Map all PayPal gateway IDs to FunnelKit PayPal gateway ID.
 		// FunnelKit PayPal powers the payment, so use fkwcppcp_paypal as the gateway ID.
 		$paypal_gateways = array(
@@ -1271,8 +1286,8 @@ class Subscriptions_Processor {
 			return 'fkwcppcp_paypal';
 		}
 
-		// Keep fkwcppcp_paypal as is (no mapping needed).
-		if ( 'fkwcppcp_paypal' === $gateway_id ) {
+		// Keep FunnelKit gateway IDs as is (no mapping needed).
+		if ( in_array( $gateway_id, array( 'fkwcppcp_paypal', 'fkwcs_stripe', 'fkwcsq_square' ), true ) ) {
 			return $gateway_id;
 		}
 
